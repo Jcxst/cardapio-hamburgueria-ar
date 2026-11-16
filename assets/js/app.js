@@ -1,35 +1,10 @@
 /**
- * AURA BURGER • 3D & Augmented Reality Digital Menu Experience
- * Powered by Google <model-viewer> & WebXR
+ * AURA BURGER • Cardápio Digital 3D & Realidade Aumentada (Escala Real 1:1)
+ * Powered by Google <model-viewer>, Scene Viewer (ARCore) & Apple Quick Look
  */
 
-// Products Catalog with 3D Models & Sensory Copywriting
+// Products Catalog with Calibrated 1:1 Physical 3D Models
 const PRODUCTS = [
-  {
-    id: 'grand-truffle',
-    name: 'The Grand Truffle Master',
-    category: 'artesanais',
-    categoryLabel: 'Burgers Artesanais',
-    price: 46.90,
-    originalPrice: 54.90,
-    rating: 4.9,
-    reviewsCount: 384,
-    badge: '🏆 Mais Vendido',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=80',
-    modelGlb: 'assets/models/burger-monster.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/mindset-code/burger-house-3d/main/public/hamburger__food_big-hamburger.glb',
-    realScaleCm: '14.5 cm de diâmetro (Escala 1:1)',
-    prepTime: '15-20 min',
-    weight: '220g de Blend Nobre',
-    shortDescription: 'Dois smash Angus 100g com queijo gouda holandês no maçarico, cogumelos salteados no azeite trufado e maionese de alho negro no brioche selado.',
-    fullDescription: 'Uma experiência sensorial incomparável. Dois suculentos smash burgers de 100g de Angus Black moído fresco na casa, queijo gouda holandês derretido sob chama direta de maçarico, mix de cogumelos shimeji e portobello salteados no azeite de trufas brancas, cebola roxa caramelizada em redução de vinho do Porto e nossa exclusiva maionese artesanal de alho negro tostado em pão brioche amanteigado com sementes de gergelim tostadas.',
-    ingredients: ['Pão Brioche de Fermentação Natural', 'Duplo Smash Angus 100g (200g total)', 'Queijo Gouda Holandês Maçaricado', 'Cogumelos Trufados Salteados', 'Cebola Caramelizada ao Vinho do Porto', 'Maionese de Alho Negro'],
-    hotspots: [
-      { name: 'Pão Brioche Selado', pos: '0m 0.12m 0m', normal: '0m 1m 0m' },
-      { name: 'Cheddar & Gouda Melt', pos: '0.04m 0.08m 0.02m', normal: '1m 0m 0m' },
-      { name: 'Duplo Smash Angus', pos: '0m 0.04m 0.04m', normal: '0m 0m 1m' }
-    ]
-  },
   {
     id: 'smash-king',
     name: 'Aura Smash King Deluxe',
@@ -42,18 +17,29 @@ const PRODUCTS = [
     badge: '🔥 Favorito da Casa',
     image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=1000&q=80',
     modelGlb: 'assets/models/burger-smash.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-smash.glb',
-    realScaleCm: '13.5 cm de diâmetro (Escala 1:1)',
+    modelHttpsUrl: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-smash.glb',
+    realScaleCm: '13.5 cm (Escala 1:1 Real)',
     prepTime: '12-15 min',
     weight: '180g de Blend Smash',
-    shortDescription: 'Dois ultra-smash 90g com crosta caramelizada Maillard, triplo cheddar inglês fundido, fatias de bacon crocante em lenha de macieira e molho especial Aura.',
-    fullDescription: 'O padrão ouro dos smash burgers. Dois discos ultrafinos de carne nobre prensados em chapa de ferro a 280°C para criar aquela crostinha Maillard crocante e caramelizada inconfundível. Cobertos com generosas fatias de cheddar inglês cremoso derretido, tiras crocantes de bacon artesanal defumado lentamente em lenha de macieira, picles crocante artesanal e o icônico molho secreto Aura Burger.',
-    ingredients: ['Pão Brioche Tostado na Manteiga', 'Duplo Ultra-Smash 90g (180g)', 'Triplo Queijo Cheddar Inglês', 'Bacon Artesanal Defumado na Macieira', 'Picles de Pepino Artesanal', 'Molho Secreto Aura'],
-    hotspots: [
-      { name: 'Pão Brioche Dourado', pos: '0m 0.10m 0m', normal: '0m 1m 0m' },
-      { name: 'Triplo Cheddar Melt', pos: '0.03m 0.06m 0.02m', normal: '1m 0m 0m' },
-      { name: 'Crosta Maillard Angus', pos: '0m 0.03m 0.04m', normal: '0m 0m 1m' }
-    ]
+    shortDescription: 'Dois ultra-smash 90g com crosta caramelizada Maillard, triplo cheddar inglês fundido e fatias de bacon crocante em lenha de macieira.'
+  },
+  {
+    id: 'grand-truffle',
+    name: 'The Grand Truffle Master',
+    category: 'artesanais',
+    categoryLabel: 'Burgers Artesanais',
+    price: 46.90,
+    originalPrice: 54.90,
+    rating: 4.9,
+    reviewsCount: 384,
+    badge: '🏆 Mais Vendido',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=80',
+    modelGlb: 'assets/models/burger-monster.glb',
+    modelHttpsUrl: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-monster.glb',
+    realScaleCm: '14.1 cm (Escala 1:1 Real)',
+    prepTime: '15-20 min',
+    weight: '220g de Blend Nobre',
+    shortDescription: 'Dois smash Angus 100g com queijo gouda holandês no maçarico, cogumelos salteados no azeite trufado e maionese de alho negro no brioche selado.'
   },
   {
     id: 'smoked-ribs',
@@ -67,18 +53,11 @@ const PRODUCTS = [
     badge: '⭐ Blend Nobre de Costela',
     image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1000&q=80',
     modelGlb: 'assets/models/burger-classic.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-classic.glb',
-    realScaleCm: '14.0 cm de diâmetro (Escala 1:1)',
+    modelHttpsUrl: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-classic.glb',
+    realScaleCm: '14.0 cm (Escala 1:1 Real)',
     prepTime: '18-22 min',
     weight: '220g de Costela Bovina',
-    shortDescription: 'Blend alto de costela 220g assado na brasa, queijo coalho dourado com melado de cana, barbecue de Bourbon e crocante de bacon no pão australiano.',
-    fullDescription: 'Para quem ama sabor rústico e autêntico de fogo e fumaça. Blend alto de 220g preparado exclusivamente com costela bovina e cupim selecionado, grelhado no charbroiler em brasa viva. Servido com fatia espessa de queijo coalho tostada com fio de melado de cana da serra, cebola crispy super sequinha, molho barbecue artesanal reduzido com uísque bourbon e finalizado em pão australiano macio e escuro.',
-    ingredients: ['Pão Australiano Artesanal com Cacau', 'Hambúrguer Alto de Costela 220g na Brasa', 'Queijo Coalho Tostado no Fogo', 'Glaçado com Melado de Cana', 'Cebola Crispy Dourada', 'Barbecue Defumado ao Bourbon'],
-    hotspots: [
-      { name: 'Pão Australiano', pos: '0m 0.045m 0m', normal: '0m 1m 0m' },
-      { name: 'Queijo Coalho Dourado', pos: '0m 0.03m 0.03m', normal: '0m 0m 1m' },
-      { name: 'Costela Angus na Brasa', pos: '0m 0.015m 0.03m', normal: '0m 0m 1m' }
-    ]
+    shortDescription: 'Blend alto de costela 220g assado na brasa, queijo coalho dourado com melado de cana, barbecue de Bourbon e crocante de bacon no pão australiano.'
   },
   {
     id: 'crispy-dragon',
@@ -92,21 +71,15 @@ const PRODUCTS = [
     badge: '🍗 Super Crocante',
     image: 'https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?auto=format&fit=crop&w=1000&q=80',
     modelGlb: 'assets/models/burger-smash.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/mindset-code/burger-house-3d/main/public/hamburger__game_asset.glb',
-    realScaleCm: '14.0 cm de diâmetro (Escala 1:1)',
+    modelHttpsUrl: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-smash.glb',
+    realScaleCm: '13.5 cm (Escala 1:1 Real)',
     prepTime: '14-18 min',
     weight: '200g Sobrecoxa Empanada',
-    shortDescription: 'Sobrecoxa desossada ultra crocante marinada por 24h em buttermilk, queijo monterey jack derretido, salada coleslaw refrescante e molho spicy chipotle.',
-    fullDescription: 'Crocância insana a cada mordida. Filé de sobrecoxa marinado em infusão de buttermilk com páprica defumada e alho confit por 24 horas, empanado em crosta rústica ultra crocante de flocos de milho temperados. Acompanha queijo Monterey Jack fundido, salada coleslaw crocante de repolho roxo com maçã verde fresca, picles de jalapeño e maionese aioli defumada de pimenta chipotle no pão de brioche.',
-    ingredients: ['Pão Brioche Selado na Manteiga', 'Sobrecoxa Marinada em Buttermilk 200g', 'Empanamento Super Crunch Especial', 'Queijo Monterey Jack', 'Salada Coleslaw com Maçã Verde', 'Aioli de Chipotle Defumado'],
-    hotspots: [
-      { name: 'Empanamento Ultra Crunch', pos: '0m 0.07m 0.04m', normal: '0m 0m 1m' },
-      { name: 'Salada Coleslaw Fresca', pos: '0m 0.10m 0.02m', normal: '0m 1m 0m' }
-    ]
+    shortDescription: 'Sobrecoxa desossada ultra crocante marinada por 24h em buttermilk, queijo monterey jack derretido, salada coleslaw e molho spicy chipotle.'
   },
   {
     id: 'fries-truffle',
-    name: 'Batatas Rústicas Trufadas com Grana Padano',
+    name: 'Batatas Rústicas Trufadas',
     category: 'acompanhamentos',
     categoryLabel: 'Acompanhamentos',
     price: 26.90,
@@ -116,20 +89,15 @@ const PRODUCTS = [
     badge: '🍟 Irresistível',
     image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?auto=format&fit=crop&w=1000&q=80',
     modelGlb: 'assets/models/burger-monster.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/mindset-code/burger-house-3d/main/public/hamburger__food_big-hamburger.glb',
+    modelHttpsUrl: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-monster.glb',
     realScaleCm: 'Porção Generosa (320g)',
     prepTime: '10-12 min',
     weight: '320g de Batatas Artesanais',
-    shortDescription: 'Batatas cortadas à mão com casca, fritas em dupla imersão, azeite de trufas brancas italianas, alecrim fresco tostado e chuva de queijo Grana Padano ralado.',
-    fullDescription: 'Acompanhamento indispensável. Batatas Asterix selecionadas cortadas rusticamente à mão com casca, cozidas no vapor e fritas em dupla temperatura para obter interior aveludado e casquinha de vidro crocante. Finalizadas imediatamente com azeite de trufas brancas importado da Itália, folhas frescas de alecrim tostadas, flor de sal de Guérande e uma generosa nuvem de queijo italiano Grana Padano ralado na hora.',
-    ingredients: ['Batatas Asterix Frescas com Casca', 'Dupla Fritura em Óleo de Algodão', 'Azeite de Trufas Brancas da Itália', 'Queijo Italiano Grana Padano Ralado', 'Alecrim Fresco e Flor de Sal'],
-    hotspots: [
-      { name: 'Crocância Perfeita', pos: '0m 0.05m 0.03m', normal: '0m 1m 0m' }
-    ]
+    shortDescription: 'Batatas com casca fritas em dupla imersão, azeite de trufas brancas italianas, alecrim fresco e chuva de queijo Grana Padano ralado.'
   },
   {
     id: 'shake-lotus',
-    name: 'Shake de Caramelo Salgado & Lotus Biscoff',
+    name: 'Shake de Caramelo & Lotus',
     category: 'sobremesas',
     categoryLabel: 'Sobremesas & Shakes',
     price: 28.90,
@@ -139,16 +107,11 @@ const PRODUCTS = [
     badge: '🍦 O Mais Pedido',
     image: 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=1000&q=80',
     modelGlb: 'assets/models/burger-classic.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/shubhamraghav1/web/master/burger.glb',
+    modelHttpsUrl: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-classic.glb',
     realScaleCm: 'Copo Grande de 480ml',
     prepTime: '8-10 min',
     weight: '480ml Cremoso',
-    shortDescription: 'Sorvete artesanal batido com calda de caramelo salgado tostado na panela de cobre, pedaços crocantes de biscoito belga Lotus Biscoff e chantilly de baunilha.',
-    fullDescription: 'Pura indulgência para fechar o pedido com chave de ouro. Sorvete artesanal tipo gelato fior di latte batido com leite integral cremoso e calda densa de caramelo salgado preparada lentamente em panela de cobre com flor de sal. Mesclado com crumble crocante de biscoitos belgas Lotus Biscoff especiados, finalizado com generoso topo de chantilly fresco e biscoito Lotus inteiro.',
-    ingredients: ['Gelato Artesanal Fior di Latte', 'Calda Artesanal de Caramelo Salgado', 'Biscoitos Belgas Lotus Biscoff Originais', 'Chantilly Fresco de Baunilha', 'Flor de Sal'],
-    hotspots: [
-      { name: 'Lotus Biscoff Belga', pos: '0m 0.10m 0m', normal: '0m 1m 0m' }
-    ]
+    shortDescription: 'Sorvete artesanal batido com calda de caramelo salgado na panela de cobre, crumble crocante de biscoitos belgas Lotus Biscoff e chantilly.'
   }
 ];
 
@@ -158,10 +121,6 @@ const state = {
   searchQuery: '',
   cart: [],
   activeProductForAR: null,
-  isCameraSimulatorActive: false,
-  cameraStream: null,
-  isAutoRotate: true,
-  isRealScale: true,
   networkIpInfo: null
 };
 
@@ -176,22 +135,14 @@ const elements = {
   cartTotal: document.getElementById('cart-total'),
   cartDiscount: document.getElementById('cart-discount'),
   cartCountBadges: document.querySelectorAll('.cart-count-badge'),
-  // AR Modal
+  // Clean AR Modal
   arModal: document.getElementById('ar-modal'),
   modelViewer: document.getElementById('burger-viewer'),
   arTitle: document.getElementById('ar-modal-title'),
   arBadge: document.getElementById('ar-modal-badge'),
   arPrice: document.getElementById('ar-modal-price'),
   arScaleBadge: document.getElementById('ar-modal-scale-badge'),
-  arWeight: document.getElementById('ar-modal-weight'),
-  arDescription: document.getElementById('ar-modal-description'),
-  arIngredientsList: document.getElementById('ar-modal-ingredients'),
   arTriggerBtn: document.getElementById('ar-trigger-btn'),
-  arCameraSimulatorBtn: document.getElementById('ar-camera-sim-btn'),
-  arCameraVideo: document.getElementById('ar-camera-feed'),
-  arCameraOverlay: document.getElementById('ar-camera-overlay'),
-  arRotateToggleBtn: document.getElementById('ar-rotate-toggle-btn'),
-  arScaleToggleBtn: document.getElementById('ar-scale-toggle-btn'),
   arAddToCartBtn: document.getElementById('ar-add-to-cart-btn'),
   // QR Code Modal
   qrModal: document.getElementById('qr-modal'),
@@ -209,20 +160,19 @@ async function initApp() {
   updateCartUI();
 }
 
-// Fetch network IP from server to display accurate QR code for phones
+// Fetch network IP from server
 async function fetchNetworkInfo() {
   try {
     const res = await fetch('/api/info');
     if (res.ok) {
       state.networkIpInfo = await res.json();
-      console.log('📡 Informações de Rede carregadas:', state.networkIpInfo);
     }
   } catch (err) {
-    console.warn('Servidor local não retornou /api/info (usando window.location)');
+    console.warn('Servidor local não retornou /api/info');
   }
 }
 
-// Render Products Grid
+// Render Products Grid with clean "Ver em Tamanho Real" button
 function renderProducts() {
   const filtered = PRODUCTS.filter(prod => {
     const matchesCategory = state.activeCategory === 'todos' || prod.category === state.activeCategory;
@@ -246,7 +196,7 @@ function renderProducts() {
   elements.productGrid.innerHTML = filtered.map(prod => `
     <article class="glass-card rounded-3xl overflow-hidden flex flex-col group relative border border-white/10 hover:border-amber-500/50">
       
-      <!-- Top Media Area -->
+      <!-- Top Image Area -->
       <div class="relative h-64 overflow-hidden bg-slate-900 cursor-pointer" onclick="openArModal('${prod.id}')">
         <img 
           src="${prod.image}" 
@@ -271,10 +221,10 @@ function renderProducts() {
           </span>
         </div>
 
-        <!-- 3D AR Interactive Badge Prompt on Image -->
-        <div class="absolute bottom-3 right-3 z-10 flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
-          <i class="fa-solid fa-cube text-sm animate-pulse"></i>
-          <span>3D & RA 1:1</span>
+        <!-- 1:1 Real Scale Badge on Image -->
+        <div class="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-cube text-xs"></i>
+          <span>Tamanho Real 1:1</span>
         </div>
 
         <div class="absolute bottom-3 left-3 z-10 text-xs font-medium text-slate-300 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full">
@@ -313,20 +263,20 @@ function renderProducts() {
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <!-- Core AR Button (User Requirement) -->
+            <!-- Core Action Button: Ver em Tamanho Real -->
             <button 
               onclick="openArModal('${prod.id}')"
-              class="w-full btn-ar-primary py-3 px-4 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 group-hover:shadow-orange-500/40"
-              title="Projetar este hambúrguer na sua mesa em Realidade Aumentada"
+              class="w-full btn-ar-primary py-3 px-3.5 rounded-xl font-extrabold text-xs text-white flex items-center justify-center gap-2 group-hover:shadow-orange-500/40"
+              title="Abrir câmera e projetar este hambúrguer na sua mesa em tamanho real"
             >
-              <i class="fa-solid fa-cubes-stacked text-base"></i>
-              <span>Ver em RA 3D</span>
+              <i class="fa-solid fa-camera text-sm"></i>
+              <span>Ver em Tamanho Real</span>
             </button>
 
             <!-- Add to Cart Button -->
             <button 
               onclick="addToCart('${prod.id}')"
-              class="w-full py-3 px-4 rounded-xl font-bold text-sm bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors flex items-center justify-center gap-2"
+              class="w-full py-3 px-3 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors flex items-center justify-center gap-1.5"
             >
               <i class="fa-solid fa-plus text-xs"></i>
               <span>Adicionar</span>
@@ -338,47 +288,28 @@ function renderProducts() {
   `).join('');
 }
 
-// Open 3D & Augmented Reality Modal
+// Open Clean 3D Modal (Zero Text on Burger, Focused on "Ver em Tamanho Real")
 function openArModal(productId) {
   const product = PRODUCTS.find(p => p.id === productId);
   if (!product) return;
 
   state.activeProductForAR = product;
 
-  // Update modal information
+  // Update top bar info
   elements.arTitle.textContent = product.name;
   elements.arBadge.textContent = product.badge;
   elements.arPrice.textContent = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
   elements.arScaleBadge.textContent = product.realScaleCm;
-  elements.arWeight.textContent = `${product.weight} • ${product.prepTime}`;
-  elements.arDescription.textContent = product.fullDescription;
 
-  // Update ingredients list
-  elements.arIngredientsList.innerHTML = product.ingredients.map(ing => `
-    <li class="flex items-center gap-2 text-xs text-slate-300">
-      <i class="fa-solid fa-check text-amber-400 text-[10px]"></i>
-      <span>${ing}</span>
-    </li>
-  `).join('');
-
-  // Update Add to Cart Button in modal
-  elements.arAddToCartBtn.innerHTML = `
-    <i class="fa-solid fa-bag-shopping"></i>
-    <span>Adicionar à Sacola • R$ ${product.price.toFixed(2).replace('.', ',')}</span>
-  `;
-  elements.arAddToCartBtn.onclick = () => {
-    addToCart(product.id);
-    closeArModal();
-  };
-
-  // Configure <model-viewer> with strict physical real scale
+  // Configure <model-viewer>
   const mv = elements.modelViewer;
   
-  // Try local model first with remote fallback
-  mv.src = product.modelGlb;
-  mv.alt = `Modelo 3D de ${product.name} em Realidade Aumentada`;
+  // Use public HTTPS model URL so Scene Viewer (ARCore) on Android can load it over Wi-Fi
+  const isOnline = navigator.onLine;
+  mv.src = (isOnline && product.modelHttpsUrl) ? product.modelHttpsUrl : product.modelGlb;
+  mv.alt = `${product.name} em Tamanho Real`;
 
-  // Enable AR attributes explicitly - Lock scale to 1:1 real life physical dimensions
+  // Strict physical AR parameters
   mv.setAttribute('ar', '');
   mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
   mv.setAttribute('ar-scale', 'fixed');
@@ -387,32 +318,22 @@ function openArModal(productId) {
   mv.setAttribute('camera-target', '0m 0.055m 0m');
   mv.setAttribute('camera-orbit', '0deg 75deg 0.32m');
   mv.setAttribute('min-camera-orbit', 'auto auto 0.22m');
-  mv.setAttribute('max-camera-orbit', 'auto auto 0.42m');
+  mv.setAttribute('max-camera-orbit', 'auto auto 0.45m');
   mv.setAttribute('shadow-intensity', '2.2');
   mv.setAttribute('shadow-softness', '0.3');
   mv.setAttribute('exposure', '1.05');
-  
-  if (state.isAutoRotate) {
-    mv.setAttribute('auto-rotate', '');
-  } else {
-    mv.removeAttribute('auto-rotate');
-  }
+  mv.setAttribute('auto-rotate', '');
 
-  // Remove previous custom hotspots and add new ones
-  mv.querySelectorAll('.hotspot-dot').forEach(el => el.remove());
-  if (product.hotspots && product.hotspots.length) {
-    product.hotspots.forEach((hs, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'hotspot-dot';
-      btn.slot = `hotspot-${idx}`;
-      btn.dataset.position = hs.pos;
-      btn.dataset.normal = hs.normal;
-      btn.innerHTML = `<span class="hotspot-annotation">${hs.name}</span>`;
-      mv.appendChild(btn);
-    });
-  }
+  // Ensure NO hotspot text bubbles or dots exist on the 3D model
+  mv.querySelectorAll('.hotspot-dot, .hotspot-annotation').forEach(el => el.remove());
 
-  // Show modal with animation
+  // Configure Add to Cart in modal
+  elements.arAddToCartBtn.onclick = () => {
+    addToCart(product.id);
+    closeArModal();
+  };
+
+  // Show clean modal
   elements.arModal.classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
   setTimeout(() => {
@@ -420,9 +341,8 @@ function openArModal(productId) {
   }, 10);
 }
 
-// Close AR Modal
+// Close Clean Modal
 function closeArModal() {
-  stopCameraSimulator();
   elements.arModal.classList.remove('modal-active');
   setTimeout(() => {
     elements.arModal.classList.add('hidden');
@@ -431,114 +351,51 @@ function closeArModal() {
   }, 250);
 }
 
-// Trigger Native Augmented Reality via <model-viewer>
+// Trigger True Native Augmented Reality (Locks firmly to table via ARCore SLAM or Quick Look)
 async function triggerAR() {
   const mv = elements.modelViewer;
   if (!mv) return;
 
-  // Check if browser/device supports native WebXR / SceneViewer / QuickLook
-  if (mv.canActivateAR) {
-    console.log('🚀 Disparando AR nativo via WebXR / Scene Viewer / Quick Look...');
-    try {
-      await mv.activateAR();
-      return;
-    } catch (err) {
-      console.warn('Falha ao ativar AR nativo:', err);
-    }
-  }
-
-  // If on desktop or non-AR mobile, prompt camera simulator or QR code
+  const product = state.activeProductForAR || PRODUCTS[0];
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+
+  // Strictly enforce fixed scale and floor placement
+  mv.setAttribute('ar-scale', 'fixed');
+  mv.setAttribute('ar-placement', 'floor');
+  mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+
   if (isMobile) {
-    // Try forcing activateAR anyway (some Android browsers support it without canActivateAR flag)
-    try {
-      await mv.activateAR();
-    } catch (e) {
-      // If still fails, activate live camera simulator
-      toggleCameraSimulator();
+    // 1. On Android: Google Scene Viewer via intent provides rock-solid ARCore SLAM plane anchoring
+    if (isAndroid) {
+      try {
+        const modelUrl = product.modelHttpsUrl || `${window.location.origin}/${product.modelGlb}`;
+        const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(modelUrl)}&mode=ar_only&resizable=false&title=${encodeURIComponent(product.name)}#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end;`;
+        
+        console.log('🚀 Acionando Google Scene Viewer (ARCore) nativo para ancoragem de mesa...');
+        window.location.href = sceneViewerIntent;
+        return;
+      } catch (e) {
+        console.warn('Fallback para modelViewer.activateAR():', e);
+      }
+    }
+
+    // 2. On iOS or WebXR: activateAR() triggers native Quick Look / WebXR
+    if (mv.canActivateAR) {
+      try {
+        await mv.activateAR();
+        return;
+      } catch (err) {
+        console.warn('Falha no activateAR:', err);
+      }
     }
   } else {
-    // On desktop: suggest QR Code or Camera Simulator
-    showDesktopArOptions();
-  }
-}
-
-// Show helper dialog for Desktop users
-function showDesktopArOptions() {
-  const choice = confirm(
-    "💡 Dica de Realidade Aumentada:\n\n" +
-    "Você está acessando pelo computador!\n\n" +
-    "• Clique em 'OK' para abrir o QR Code e escanear com o seu celular (experiência 100% nativa na mesa).\n" +
-    "• Ou clique em 'Cancelar' para ativar a Câmera Web do seu notebook/PC e ver a simulação aqui na tela."
-  );
-
-  if (choice) {
+    // On desktop: display the QR Code so user can open on mobile
     openQrModal();
-  } else {
-    toggleCameraSimulator();
   }
 }
 
-// Toggle Live Camera Background Simulator (Desktop / Laptop / WebAR Fallback)
-async function toggleCameraSimulator() {
-  if (state.isCameraSimulatorActive) {
-    stopCameraSimulator();
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
-      audio: false
-    });
-
-    state.cameraStream = stream;
-    elements.arCameraVideo.srcObject = stream;
-    elements.arCameraVideo.classList.remove('hidden');
-    elements.arCameraOverlay.classList.remove('hidden');
-    elements.arModal.classList.add('camera-active');
-    // Lock zoom so model stays in 1:1 real proportion on camera preview
-    elements.modelViewer.setAttribute('disable-zoom', '');
-    elements.modelViewer.setAttribute('camera-orbit', '0deg 75deg 0.32m');
-    state.isCameraSimulatorActive = true;
-
-    elements.arCameraSimulatorBtn.innerHTML = `
-      <i class="fa-solid fa-camera-slash text-red-400"></i>
-      <span>Desativar Câmera</span>
-    `;
-    elements.arCameraSimulatorBtn.classList.add('border-red-500/50', 'text-red-300');
-
-    console.log('📸 Câmera ativada para simulação de Realidade Aumentada');
-  } catch (err) {
-    console.error('Erro ao acessar câmera:', err);
-    alert('Não foi possível acessar a câmera do dispositivo. Verifique as permissões do seu navegador.');
-  }
-}
-
-function stopCameraSimulator() {
-  if (state.cameraStream) {
-    state.cameraStream.getTracks().forEach(track => track.stop());
-    state.cameraStream = null;
-  }
-  elements.arCameraVideo.srcObject = null;
-  elements.arCameraVideo.classList.add('hidden');
-  elements.arCameraOverlay.classList.add('hidden');
-  elements.arModal.classList.remove('camera-active');
-  elements.modelViewer.removeAttribute('disable-zoom');
-  state.isCameraSimulatorActive = false;
-
-  elements.arCameraSimulatorBtn.innerHTML = `
-    <i class="fa-solid fa-camera text-amber-400"></i>
-    <span>Simulador com Câmera</span>
-  `;
-  elements.arCameraSimulatorBtn.classList.remove('border-red-500/50', 'text-red-300');
-}
-
-// Setup Model Viewer Events (loading progress, errors, fallbacks)
+// Model Viewer Events
 function setupModelViewerEvents() {
   const mv = elements.modelViewer;
   if (!mv) return;
@@ -558,28 +415,19 @@ function setupModelViewerEvents() {
     }
   });
 
-  mv.addEventListener('error', (err) => {
-    console.warn('Erro ao carregar modelo local, alternando para fallback CDN:', err);
-    if (state.activeProductForAR && state.activeProductForAR.modelCdnFallback) {
-      mv.src = state.activeProductForAR.modelCdnFallback;
-    }
-  });
-
-  mv.addEventListener('ar-status', (event) => {
-    console.log('Status da sessão AR:', event.detail.status);
-    if (event.detail.status === 'failed') {
-      alert('Seu dispositivo não suporta o modo AR nativo diretamente. Ativando o Simulador com Câmera!');
-      toggleCameraSimulator();
+  mv.addEventListener('error', () => {
+    // If remote URL fails, fallback to local GLB
+    if (state.activeProductForAR) {
+      mv.src = state.activeProductForAR.modelGlb;
     }
   });
 }
 
-// QR Code Pairing for Mobile Testing
+// QR Code Pairing for Desktop Users
 function openQrModal() {
   const container = elements.qrContainer;
   container.innerHTML = '';
 
-  // Determine the best URL for mobile:
   let mobileUrl = window.location.href;
   if (state.networkIpInfo && state.networkIpInfo.primaryIp && !window.location.hostname.includes('192.168.')) {
     mobileUrl = `http://${state.networkIpInfo.primaryIp}:${state.networkIpInfo.port || 3000}`;
@@ -587,7 +435,6 @@ function openQrModal() {
 
   elements.mobileUrlDisplay.textContent = mobileUrl;
 
-  // Generate QR Code with qrcode.js
   if (typeof QRCode !== 'undefined') {
     new QRCode(container, {
       text: mobileUrl,
@@ -660,7 +507,7 @@ function updateCartUI() {
       <div class="py-12 text-center text-slate-400">
         <i class="fa-solid fa-basket-shopping text-4xl mb-3 text-slate-600"></i>
         <p class="text-sm">Sua sacola está vazia.</p>
-        <p class="text-xs text-slate-500 mt-1">Explore os burgers e veja em Realidade Aumentada!</p>
+        <p class="text-xs text-slate-500 mt-1">Toque em "Ver em Tamanho Real" para testar na mesa!</p>
       </div>
     `;
     return;
@@ -702,7 +549,7 @@ function checkoutWhatsApp() {
   }
 
   const customerName = document.getElementById('checkout-name')?.value.trim() || 'Cliente';
-  const tableOrAddress = document.getElementById('checkout-address')?.value.trim() || 'Consumo no Local / Retirada';
+  const tableOrAddress = document.getElementById('checkout-address')?.value.trim() || 'Consumo no Local / Mesa';
   const notes = document.getElementById('checkout-notes')?.value.trim() || 'Sem observações';
 
   const subtotal = state.cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
@@ -726,7 +573,7 @@ function checkoutWhatsApp() {
   msg += `*Observações:* ${notes}\n\n`;
   msg += `_Pedido gerado via Cardápio Digital 3D & Realidade Aumentada_`;
 
-  const phone = '5511999999999'; // Número fictício de demonstração da hamburgueria
+  const phone = '5511999999999';
   const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
   window.open(url, '_blank');
 }
@@ -761,9 +608,8 @@ function showToastNotification(message) {
   }, 2400);
 }
 
-// Event Listeners Setup
+// Event Listeners
 function setupEventListeners() {
-  // Category tabs filter
   if (elements.categoryTabs) {
     elements.categoryTabs.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-category]');
@@ -782,33 +628,10 @@ function setupEventListeners() {
     });
   }
 
-  // Search input
   if (elements.searchInput) {
     elements.searchInput.addEventListener('input', (e) => {
       state.searchQuery = e.target.value;
       renderProducts();
-    });
-  }
-
-  // Auto-rotate toggle in AR Modal
-  if (elements.arRotateToggleBtn) {
-    elements.arRotateToggleBtn.addEventListener('click', () => {
-      state.isAutoRotate = !state.isAutoRotate;
-      if (state.isAutoRotate) {
-        elements.modelViewer.setAttribute('auto-rotate', '');
-        elements.arRotateToggleBtn.classList.add('text-amber-400');
-      } else {
-        elements.modelViewer.removeAttribute('auto-rotate');
-        elements.arRotateToggleBtn.classList.remove('text-amber-400');
-      }
-    });
-  }
-
-  // Real scale lock feedback
-  if (elements.arScaleToggleBtn) {
-    elements.arScaleToggleBtn.addEventListener('click', () => {
-      elements.modelViewer.setAttribute('ar-scale', 'fixed');
-      showToastNotification('🔒 Escala Real 1:1 Travada: O hambúrguer é exibido no tamanho exato de consumo (~14 cm)');
     });
   }
 
@@ -822,11 +645,10 @@ function setupEventListeners() {
   });
 }
 
-// Global functions exposed to inline HTML triggers
+// Global functions exposed to window
 window.openArModal = openArModal;
 window.closeArModal = closeArModal;
 window.triggerAR = triggerAR;
-window.toggleCameraSimulator = toggleCameraSimulator;
 window.openQrModal = openQrModal;
 window.closeQrModal = closeQrModal;
 window.addToCart = addToCart;
