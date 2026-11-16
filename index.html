@@ -535,8 +535,8 @@
               type="text" 
               id="admin-username" 
               required 
-              value="teste3d"
-              placeholder="teste3d"
+              autocomplete="username"
+              placeholder="Digite o usuário"
               class="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
             />
           </div>
@@ -550,7 +550,7 @@
               type="password" 
               id="admin-password" 
               required 
-              value="123teste"
+              autocomplete="current-password"
               placeholder="••••••••"
               class="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
             />
@@ -560,11 +560,6 @@
         <div id="admin-auth-error" class="hidden p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
           <i class="fa-solid fa-circle-exclamation text-sm shrink-0"></i>
           <span id="admin-auth-error-msg">Usuário ou senha incorretos.</span>
-        </div>
-
-        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center justify-between">
-          <span>Acesso liberado:</span>
-          <span class="font-mono font-bold bg-black/40 px-2 py-0.5 rounded text-amber-400">teste3d / 123teste</span>
         </div>
 
         <button 
