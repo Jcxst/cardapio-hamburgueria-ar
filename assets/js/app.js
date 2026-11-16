@@ -304,14 +304,13 @@ function openArModal(productId) {
   // Configure <model-viewer>
   const mv = elements.modelViewer;
   
-  // Use public HTTPS model URL so Scene Viewer (ARCore) on Android can load it over Wi-Fi
-  const isOnline = navigator.onLine;
-  mv.src = (isOnline && product.modelHttpsUrl) ? product.modelHttpsUrl : product.modelGlb;
+  // Use local calibrated GLB for instant loading
+  mv.src = product.modelGlb;
   mv.alt = `${product.name} em Tamanho Real`;
 
   // Strict physical AR parameters
   mv.setAttribute('ar', '');
-  mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+  mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
   mv.setAttribute('ar-scale', 'fixed');
   mv.setAttribute('ar-placement', 'floor');
   mv.setAttribute('camera-controls', '');
@@ -351,47 +350,37 @@ function closeArModal() {
   }, 250);
 }
 
-// Trigger True Native Augmented Reality (Locks firmly to table via ARCore SLAM or Quick Look)
-async function triggerAR() {
+// Trigger True Native Augmented Reality (Locks firmly to table via WebXR or Scene Viewer / Quick Look)
+function triggerAR() {
   const mv = elements.modelViewer;
   if (!mv) return;
 
-  const product = state.activeProductForAR || PRODUCTS[0];
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (!isMobile) {
+    openQrModal();
+    return;
+  }
 
   // Strictly enforce fixed scale and floor placement
   mv.setAttribute('ar-scale', 'fixed');
   mv.setAttribute('ar-placement', 'floor');
-  mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+  mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
 
-  if (isMobile) {
-    // 1. On Android: Google Scene Viewer via intent provides rock-solid ARCore SLAM plane anchoring
-    if (isAndroid) {
-      try {
-        const modelUrl = product.modelHttpsUrl || `${window.location.origin}/${product.modelGlb}`;
-        const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(modelUrl)}&mode=ar_only&resizable=false&title=${encodeURIComponent(product.name)}#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end;`;
-        
-        console.log('🚀 Acionando Google Scene Viewer (ARCore) nativo para ancoragem de mesa...');
-        window.location.href = sceneViewerIntent;
-        return;
-      } catch (e) {
-        console.warn('Fallback para modelViewer.activateAR():', e);
-      }
+  // 1. Direct call to model-viewer's official activateAR() API
+  try {
+    if (typeof mv.activateAR === 'function') {
+      console.log('🚀 Acionando Realidade Aumentada nativa via mv.activateAR()...');
+      mv.activateAR();
+      return;
     }
+  } catch (err) {
+    console.warn('Erro ao chamar mv.activateAR():', err);
+  }
 
-    // 2. On iOS or WebXR: activateAR() triggers native Quick Look / WebXR
-    if (mv.canActivateAR) {
-      try {
-        await mv.activateAR();
-        return;
-      } catch (err) {
-        console.warn('Falha no activateAR:', err);
-      }
-    }
-  } else {
-    // On desktop: display the QR Code so user can open on mobile
-    openQrModal();
+  // 2. Fallback: simulate click on the slotted AR button
+  const slotBtn = document.getElementById('ar-native-slot-btn');
+  if (slotBtn) {
+    slotBtn.click();
   }
 }
 

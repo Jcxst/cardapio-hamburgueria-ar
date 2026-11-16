@@ -310,7 +310,7 @@
           src="assets/models/burger-smash.glb"
           alt="Hambúrguer em 3D e Realidade Aumentada"
           ar
-          ar-modes="scene-viewer webxr quick-look"
+          ar-modes="webxr scene-viewer quick-look"
           ar-scale="fixed"
           ar-placement="floor"
           camera-controls
@@ -327,11 +327,8 @@
           max-camera-orbit="auto auto 0.45m"
           class="w-full h-full"
         >
-          <!-- Native AR Slot Button for Model Viewer -->
-          <button slot="ar-button" id="ar-native-slot-btn" class="ar-floating-button">
-            <i class="fa-solid fa-camera-retro text-lg"></i>
-            <span>Ver em Tamanho Real</span>
-          </button>
+          <!-- Internal slotted AR button (hidden from canvas so only the main bottom button is shown) -->
+          <button slot="ar-button" id="ar-native-slot-btn" style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;"></button>
 
           <!-- Loading Progress Bar -->
           <div id="ar-loading-bar" class="ar-progress-bar" slot="poster">
