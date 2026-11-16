@@ -26,8 +26,8 @@ const PRODUCTS = [
     ingredients: ['Pão Brioche de Fermentação Natural', 'Duplo Smash Angus 100g (200g total)', 'Queijo Gouda Holandês Maçaricado', 'Cogumelos Trufados Salteados', 'Cebola Caramelizada ao Vinho do Porto', 'Maionese de Alho Negro'],
     hotspots: [
       { name: 'Pão Brioche Selado', pos: '0m 0.12m 0m', normal: '0m 1m 0m' },
-      { name: 'Cheddar & Gouda Melt', pos: '0.04m 0.08m 0.03m', normal: '1m 0m 0m' },
-      { name: 'Duplo Smash Angus', pos: '0m 0.05m 0.05m', normal: '0m 0m 1m' }
+      { name: 'Cheddar & Gouda Melt', pos: '0.04m 0.08m 0.02m', normal: '1m 0m 0m' },
+      { name: 'Duplo Smash Angus', pos: '0m 0.04m 0.04m', normal: '0m 0m 1m' }
     ]
   },
   {
@@ -42,17 +42,17 @@ const PRODUCTS = [
     badge: '🔥 Favorito da Casa',
     image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=1000&q=80',
     modelGlb: 'assets/models/burger-smash.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/mindset-code/burger-house-3d/main/public/hamburger__game_asset.glb',
-    realScaleCm: '13.0 cm de diâmetro (Escala 1:1)',
+    modelCdnFallback: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-smash.glb',
+    realScaleCm: '13.5 cm de diâmetro (Escala 1:1)',
     prepTime: '12-15 min',
     weight: '180g de Blend Smash',
     shortDescription: 'Dois ultra-smash 90g com crosta caramelizada Maillard, triplo cheddar inglês fundido, fatias de bacon crocante em lenha de macieira e molho especial Aura.',
     fullDescription: 'O padrão ouro dos smash burgers. Dois discos ultrafinos de carne nobre prensados em chapa de ferro a 280°C para criar aquela crostinha Maillard crocante e caramelizada inconfundível. Cobertos com generosas fatias de cheddar inglês cremoso derretido, tiras crocantes de bacon artesanal defumado lentamente em lenha de macieira, picles crocante artesanal e o icônico molho secreto Aura Burger.',
     ingredients: ['Pão Brioche Tostado na Manteiga', 'Duplo Ultra-Smash 90g (180g)', 'Triplo Queijo Cheddar Inglês', 'Bacon Artesanal Defumado na Macieira', 'Picles de Pepino Artesanal', 'Molho Secreto Aura'],
     hotspots: [
-      { name: 'Crosta Maillard Crocante', pos: '0m 0.06m 0.04m', normal: '0m 0m 1m' },
-      { name: 'Triplo Cheddar Inglês', pos: '0.03m 0.07m 0m', normal: '1m 0m 0m' },
-      { name: 'Bacon Defumado Artesanal', pos: '-0.03m 0.08m 0.02m', normal: '-1m 0m 0m' }
+      { name: 'Pão Brioche Dourado', pos: '0m 0.10m 0m', normal: '0m 1m 0m' },
+      { name: 'Triplo Cheddar Melt', pos: '0.03m 0.06m 0.02m', normal: '1m 0m 0m' },
+      { name: 'Crosta Maillard Angus', pos: '0m 0.03m 0.04m', normal: '0m 0m 1m' }
     ]
   },
   {
@@ -67,17 +67,17 @@ const PRODUCTS = [
     badge: '⭐ Blend Nobre de Costela',
     image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1000&q=80',
     modelGlb: 'assets/models/burger-classic.glb',
-    modelCdnFallback: 'https://raw.githubusercontent.com/shubhamraghav1/web/master/burger.glb',
-    realScaleCm: '15.0 cm de diâmetro (Escala 1:1)',
+    modelCdnFallback: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-classic.glb',
+    realScaleCm: '14.0 cm de diâmetro (Escala 1:1)',
     prepTime: '18-22 min',
     weight: '220g de Costela Bovina',
     shortDescription: 'Blend alto de costela 220g assado na brasa, queijo coalho dourado com melado de cana, barbecue de Bourbon e crocante de bacon no pão australiano.',
     fullDescription: 'Para quem ama sabor rústico e autêntico de fogo e fumaça. Blend alto de 220g preparado exclusivamente com costela bovina e cupim selecionado, grelhado no charbroiler em brasa viva. Servido com fatia espessa de queijo coalho tostada com fio de melado de cana da serra, cebola crispy super sequinha, molho barbecue artesanal reduzido com uísque bourbon e finalizado em pão australiano macio e escuro.',
     ingredients: ['Pão Australiano Artesanal com Cacau', 'Hambúrguer Alto de Costela 220g na Brasa', 'Queijo Coalho Tostado no Fogo', 'Glaçado com Melado de Cana', 'Cebola Crispy Dourada', 'Barbecue Defumado ao Bourbon'],
     hotspots: [
-      { name: 'Pão Australiano Macio', pos: '0m 0.13m 0m', normal: '0m 1m 0m' },
-      { name: 'Queijo Coalho Dourado', pos: '0m 0.09m 0.04m', normal: '0m 0m 1m' },
-      { name: 'Costela Angus 220g', pos: '0m 0.05m 0.03m', normal: '0m 0m 1m' }
+      { name: 'Pão Australiano', pos: '0m 0.045m 0m', normal: '0m 1m 0m' },
+      { name: 'Queijo Coalho Dourado', pos: '0m 0.03m 0.03m', normal: '0m 0m 1m' },
+      { name: 'Costela Angus na Brasa', pos: '0m 0.015m 0.03m', normal: '0m 0m 1m' }
     ]
   },
   {
@@ -371,22 +371,26 @@ function openArModal(productId) {
     closeArModal();
   };
 
-  // Configure <model-viewer>
+  // Configure <model-viewer> with strict physical real scale
   const mv = elements.modelViewer;
   
   // Try local model first with remote fallback
   mv.src = product.modelGlb;
   mv.alt = `Modelo 3D de ${product.name} em Realidade Aumentada`;
 
-  // Enable AR attributes explicitly
+  // Enable AR attributes explicitly - Lock scale to 1:1 real life physical dimensions
   mv.setAttribute('ar', '');
-  mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
-  mv.setAttribute('ar-scale', state.isRealScale ? 'fixed' : 'auto');
+  mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+  mv.setAttribute('ar-scale', 'fixed');
   mv.setAttribute('ar-placement', 'floor');
   mv.setAttribute('camera-controls', '');
-  mv.setAttribute('shadow-intensity', '1.6');
-  mv.setAttribute('shadow-softness', '0.9');
-  mv.setAttribute('exposure', '1.1');
+  mv.setAttribute('camera-target', '0m 0.055m 0m');
+  mv.setAttribute('camera-orbit', '0deg 75deg 0.32m');
+  mv.setAttribute('min-camera-orbit', 'auto auto 0.22m');
+  mv.setAttribute('max-camera-orbit', 'auto auto 0.42m');
+  mv.setAttribute('shadow-intensity', '2.2');
+  mv.setAttribute('shadow-softness', '0.3');
+  mv.setAttribute('exposure', '1.05');
   
   if (state.isAutoRotate) {
     mv.setAttribute('auto-rotate', '');
@@ -497,6 +501,9 @@ async function toggleCameraSimulator() {
     elements.arCameraVideo.classList.remove('hidden');
     elements.arCameraOverlay.classList.remove('hidden');
     elements.arModal.classList.add('camera-active');
+    // Lock zoom so model stays in 1:1 real proportion on camera preview
+    elements.modelViewer.setAttribute('disable-zoom', '');
+    elements.modelViewer.setAttribute('camera-orbit', '0deg 75deg 0.32m');
     state.isCameraSimulatorActive = true;
 
     elements.arCameraSimulatorBtn.innerHTML = `
@@ -521,6 +528,7 @@ function stopCameraSimulator() {
   elements.arCameraVideo.classList.add('hidden');
   elements.arCameraOverlay.classList.add('hidden');
   elements.arModal.classList.remove('camera-active');
+  elements.modelViewer.removeAttribute('disable-zoom');
   state.isCameraSimulatorActive = false;
 
   elements.arCameraSimulatorBtn.innerHTML = `
@@ -796,13 +804,11 @@ function setupEventListeners() {
     });
   }
 
-  // Real scale lock toggle
+  // Real scale lock feedback
   if (elements.arScaleToggleBtn) {
     elements.arScaleToggleBtn.addEventListener('click', () => {
-      state.isRealScale = !state.isRealScale;
-      elements.modelViewer.setAttribute('ar-scale', state.isRealScale ? 'fixed' : 'auto');
-      elements.arScaleToggleBtn.classList.toggle('text-amber-400', state.isRealScale);
-      showToastNotification(state.isRealScale ? '📏 Escala Real 1:1 Travada' : '🔍 Escala Livre Ativada');
+      elements.modelViewer.setAttribute('ar-scale', 'fixed');
+      showToastNotification('🔒 Escala Real 1:1 Travada: O hambúrguer é exibido no tamanho exato de consumo (~14 cm)');
     });
   }
 

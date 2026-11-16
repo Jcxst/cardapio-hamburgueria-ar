@@ -321,10 +321,11 @@
             </button>
             <button 
               id="ar-scale-toggle-btn"
-              class="w-8 h-8 rounded-lg text-amber-400 hover:bg-white/10 flex items-center justify-center text-xs transition-colors"
-              title="Travar/Liberar Escala Real 1:1"
+              class="px-2.5 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 flex items-center gap-1.5 text-xs font-bold transition-colors"
+              title="Escala 1:1 Travada no tamanho real físico (~14 cm)"
             >
-              <i class="fa-solid fa-ruler-combined"></i>
+              <i class="fa-solid fa-lock text-[10px]"></i>
+              <span>1:1 Fixo</span>
             </button>
           </div>
         </div>
@@ -337,7 +338,7 @@
             src="assets/models/burger-monster.glb"
             alt="Hambúrguer Gourmet em 3D e Realidade Aumentada"
             ar
-            ar-modes="webxr scene-viewer quick-look"
+            ar-modes="scene-viewer webxr quick-look"
             ar-scale="fixed"
             ar-placement="floor"
             camera-controls
@@ -345,12 +346,13 @@
             auto-rotate
             auto-rotate-delay="500"
             rotation-per-second="24deg"
-            shadow-intensity="1.7"
-            shadow-softness="0.8"
-            exposure="1.1"
-            camera-orbit="0deg 75deg 105%"
-            min-camera-orbit="auto auto 5%"
-            max-camera-orbit="auto auto 300%"
+            shadow-intensity="2.2"
+            shadow-softness="0.3"
+            exposure="1.05"
+            camera-target="0m 0.055m 0m"
+            camera-orbit="0deg 75deg 0.32m"
+            min-camera-orbit="auto auto 0.22m"
+            max-camera-orbit="auto auto 0.42m"
             class="w-full h-full"
           >
             <!-- Native AR Slot Button for Model Viewer -->
@@ -365,8 +367,9 @@
             </div>
 
             <!-- AR Prompt Instructions (Hand Gesture on Mobile) -->
-            <div slot="ar-prompt" class="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/80 px-4 py-2 rounded-xl text-xs text-white border border-white/20">
-              Mova o celular em círculos para detectar a mesa
+            <div slot="ar-prompt" class="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/90 px-4 py-2 rounded-xl text-xs text-white border border-amber-500/30 shadow-xl flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+              <span>Aponte para a mesa e mova lentamente para fixar</span>
             </div>
           </model-viewer>
 
