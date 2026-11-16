@@ -1001,13 +1001,13 @@ async function adminDeleteProduct(productId, encodedName) {
   }
 }
 
-// Processamento de imagem em Canvas: Remoção de fundo branco/neutro e detecção de silhueta
+// Processamento de imagem em Canvas: Remoção de fundo branco/neutro, despeckle e detecção de silhueta
 function processImageBackgroundAndSilhouette(img) {
   const canvas = document.createElement('canvas');
   let w = img.naturalWidth || img.width;
   let h = img.naturalHeight || img.height;
 
-  // Limite razoável para processamento rápido e textura nítida
+  // Limite para processamento ágil com alta fidelidade de textura
   const maxDim = 1024;
   if (w > maxDim || h > maxDim) {
     if (w > h) {
@@ -1027,12 +1027,12 @@ function processImageBackgroundAndSilhouette(img) {
   const imgData = ctx.getImageData(0, 0, w, h);
   const data = imgData.data;
 
-  // 1. Amostra os 4 cantos para verificar se o fundo é claro/branco
+  // 1. Amostra cantos e bordas para identificar a cor do fundo
   const corners = [
-    0, // top-left
-    (w - 1) * 4, // top-right
-    (h - 1) * w * 4, // bottom-left
-    ((h - 1) * w + (w - 1)) * 4 // bottom-right
+    0,
+    (w - 1) * 4,
+    (h - 1) * w * 4,
+    ((h - 1) * w + (w - 1)) * 4
   ];
 
   let sumR = 0, sumG = 0, sumB = 0;
@@ -1045,10 +1045,9 @@ function processImageBackgroundAndSilhouette(img) {
   const avgG = sumG / 4;
   const avgB = sumB / 4;
 
-  const isLightBg = avgR > 185 && avgG > 185 && avgB > 185;
+  const isLightBg = avgR > 175 && avgG > 175 && avgB > 175;
 
-  // 2. Se for fundo branco/claro, aplica Flood Fill a partir das 4 bordas externas
-  // Isso preserva detalhes brancos internos do hambúrguer (gergelim, queijo, maionese, texto da tábua)
+  // 2. Se for fundo branco/estúdio, aplica Flood Fill conectado às 4 bordas
   if (isLightBg) {
     const visited = new Uint8Array(w * h);
     const queue = [];
@@ -1060,32 +1059,29 @@ function processImageBackgroundAndSilhouette(img) {
       return Math.sqrt(dr * dr + dg * dg + db * db);
     }
 
-    // Adiciona pixels das 4 bordas que combinam com a cor do fundo
+    // Bordas superiores e inferiores
     for (let x = 0; x < w; x++) {
-      // Topo
       const topIdx = x * 4;
-      if (colorDist(topIdx) < 58) {
+      if (colorDist(topIdx) < 65) {
         visited[x] = 1;
         queue.push(x);
       }
-      // Fundo
       const btmIdx = ((h - 1) * w + x) * 4;
-      if (colorDist(btmIdx) < 58) {
+      if (colorDist(btmIdx) < 65) {
         visited[(h - 1) * w + x] = 1;
         queue.push((h - 1) * w + x);
       }
     }
 
+    // Bordas laterais
     for (let y = 0; y < h; y++) {
-      // Esquerda
       const leftIdx = (y * w) * 4;
-      if (!visited[y * w] && colorDist(leftIdx) < 58) {
+      if (!visited[y * w] && colorDist(leftIdx) < 65) {
         visited[y * w] = 1;
         queue.push(y * w);
       }
-      // Direita
       const rightIdx = (y * w + (w - 1)) * 4;
-      if (!visited[y * w + (w - 1)] && colorDist(rightIdx) < 58) {
+      if (!visited[y * w + (w - 1)] && colorDist(rightIdx) < 65) {
         visited[y * w + (w - 1)] = 1;
         queue.push(y * w + (w - 1));
       }
@@ -1099,10 +1095,8 @@ function processImageBackgroundAndSilhouette(img) {
       const py = Math.floor(pos / w);
       const pIdx = pos * 4;
 
-      // Torna pixel transparente
-      data[pIdx + 3] = 0;
+      data[pIdx + 3] = 0; // Transparente
 
-      // Vizinhos: cima, baixo, esquerda, direita
       const neighbors = [];
       if (px > 0) neighbors.push(pos - 1);
       if (px < w - 1) neighbors.push(pos + 1);
@@ -1113,8 +1107,29 @@ function processImageBackgroundAndSilhouette(img) {
         if (!visited[n]) {
           visited[n] = 1;
           const nIdx = n * 4;
-          if (colorDist(nIdx) < 62) {
+          if (colorDist(nIdx) < 70) {
             queue.push(n);
+          }
+        }
+      }
+    }
+
+    // 2.1 Despeckle Filter: Remove ilhas e pontos isolados de poeira/ruído de compressão JPEG no ar
+    for (let y = 2; y < h - 2; y++) {
+      for (let x = 2; x < w - 2; x++) {
+        const idx = (y * w + x) * 4;
+        if (data[idx + 3] > 0) {
+          let opaqueCount = 0;
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const npos = (y + dy) * w + (x + dx);
+              if (data[npos * 4 + 3] > 30) opaqueCount++;
+            }
+          }
+          // Ponto flutuante sem sustentação de corpo sólido
+          if (opaqueCount < 8) {
+            data[idx + 3] = 0;
           }
         }
       }
@@ -1123,7 +1138,7 @@ function processImageBackgroundAndSilhouette(img) {
     ctx.putImageData(imgData, 0, 0);
   }
 
-  // 3. Calcula a bounding box do item em primeiro plano e a proporção de aspecto real
+  // 3. Mede a bounding box do corpo de alimento limpo
   let minX = w, maxX = 0, minY = h, maxY = 0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -1165,7 +1180,6 @@ function handlePhotoFileSelected(e) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = function() {
-      // Processa remoção de fundo e detecção de formato real
       const processed = processImageBackgroundAndSilhouette(img);
       state.detectedAspectRatio = processed.aspectRatio;
 
@@ -1193,13 +1207,13 @@ function handlePhotoFileSelected(e) {
         previewWrap.classList.remove('hidden');
       }
 
-      // Auto-seleciona o formato adequado conforme a silhueta da foto
+      // Detecção inteligente da proporção da foto
       let detectedLabel = 'Hambúrguer Individual (13.5 cm)';
       if (meshSelect) {
-        if (processed.aspectRatio >= 1.25) {
+        if (processed.aspectRatio >= 1.05) {
           meshSelect.value = 'combo';
           detectedLabel = '🍱 Combo Completo / Tábua (28 cm)';
-        } else if (processed.aspectRatio <= 0.70) {
+        } else if (processed.aspectRatio <= 0.75) {
           meshSelect.value = 'drink';
           detectedLabel = '🥤 Bebida / Garrafa / Copo (22 cm)';
         } else {
@@ -1220,99 +1234,73 @@ function handlePhotoFileSelected(e) {
   reader.readAsDataURL(file);
 }
 
-// Constrói modelo 3D GLB volumétrico client-side com curvatura e silhueta real
-async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', width = 0.28, height = 0.18, depth = 0.085) {
+// Constrói modelo 3D GLB volumétrico client-side sem distorção e sem visão dupla fantasma
+async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', width = 0.28, height = 0.18, depth = 0.04) {
   try {
-    const cols = 24, rows = 10;
-    const positions = [];
-    const uvs = [];
-    const normals = [];
-    const indices = [];
+    const w = width / 2;
+    const h = height;
+    const d = depth / 2;
 
-    // 1. Face frontal com curvatura suave
-    for (let r = 0; r <= rows; r++) {
-      const t = r / rows;
-      for (let c = 0; c <= cols; c++) {
-        const u = c / cols;
-        const x = (u - 0.5) * width;
-        const y = t * height;
-        const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
-        const z = (depth / 2) * (0.25 + 0.75 * bulge);
-        positions.push(x, y, z);
-        uvs.push(u, 1.0 - t);
+    // 24 vértices para um bloco tridimensional limpo e perfeitamente ancorado
+    const positions = [
+      // Frontal (Z = +d)
+      -w, 0,  d,   w, 0,  d,   w, h,  d,  -w, h,  d,
+      // Traseira (Z = -d)
+      -w, 0, -d,  -w, h, -d,   w, h, -d,   w, 0, -d,
+      // Topo
+      -w, h,  d,   w, h,  d,   w, h, -d,  -w, h, -d,
+      // Base (apoiada na mesa em Y = 0)
+      -w, 0, -d,   w, 0, -d,   w, 0,  d,  -w, 0,  d,
+      // Direita
+       w, 0,  d,   w, 0, -d,   w, h, -d,   w, h,  d,
+      // Esquerda
+      -w, 0, -d,  -w, 0,  d,  -w, h,  d,  -w, h, -d
+    ];
 
-        const nx = -Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
-        const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
-        const nz = 0.9;
-        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-        normals.push(nx / len, ny / len, nz / len);
-      }
-    }
+    const normals = [
+      // Frontal
+      0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
+      // Traseira
+      0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1,
+      // Topo
+      0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
+      // Base
+      0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0,
+      // Direita
+      1, 0, 0,  1, 0, 0,  1, 0, 0,  1, 0, 0,
+      // Esquerda
+      -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0
+    ];
 
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const i0 = r * (cols + 1) + c;
-        const i1 = i0 + 1;
-        const i2 = (r + 1) * (cols + 1) + c;
-        const i3 = i2 + 1;
-        indices.push(i0, i1, i2);
-        indices.push(i1, i3, i2);
-      }
-    }
+    const uvs = [
+      // Frontal
+      0, 1,   1, 1,   1, 0,   0, 0,
+      // Traseira (espelhada)
+      1, 1,   1, 0,   0, 0,   0, 1,
+      // Topo
+      0, 0.02, 1, 0.02, 1, 0, 0, 0,
+      // Base
+      0, 1, 1, 1, 1, 0.98, 0, 0.98,
+      // Direita
+      0.98, 1, 1, 1, 1, 0, 0.98, 0,
+      // Esquerda
+      0, 1, 0.02, 1, 0.02, 0, 0, 0
+    ];
 
-    // 2. Face traseira
-    const backOffset = positions.length / 3;
-    for (let r = 0; r <= rows; r++) {
-      const t = r / rows;
-      for (let c = 0; c <= cols; c++) {
-        const u = c / cols;
-        const x = (u - 0.5) * width;
-        const y = t * height;
-        const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
-        const z = -(depth / 2) * (0.25 + 0.75 * bulge);
-        positions.push(x, y, z);
-        uvs.push(1.0 - u, 1.0 - t);
-
-        const nx = Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
-        const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
-        const nz = -0.9;
-        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-        normals.push(nx / len, ny / len, nz / len);
-      }
-    }
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const i0 = backOffset + r * (cols + 1) + c;
-        const i1 = i0 + 1;
-        const i2 = backOffset + (r + 1) * (cols + 1) + c;
-        const i3 = i2 + 1;
-        indices.push(i0, i2, i1);
-        indices.push(i1, i2, i3);
-      }
-    }
-
-    // 3. Bordas perimétricas (topo, base na mesa, esquerda, direita)
-    for (let c = 0; c < cols; c++) {
-      const f0 = rows * (cols + 1) + c, f1 = f0 + 1;
-      const b0 = backOffset + rows * (cols + 1) + c, b1 = b0 + 1;
-      indices.push(f0, f1, b0); indices.push(f1, b1, b0);
-    }
-    for (let c = 0; c < cols; c++) {
-      const f0 = c, f1 = c + 1;
-      const b0 = backOffset + c, b1 = b0 + 1;
-      indices.push(f0, b0, f1); indices.push(f1, b0, b1);
-    }
-    for (let r = 0; r < rows; r++) {
-      const f0 = r * (cols + 1), f1 = (r + 1) * (cols + 1);
-      const b0 = backOffset + r * (cols + 1), b1 = backOffset + (r + 1) * (cols + 1);
-      indices.push(f0, b0, f1); indices.push(f1, b0, b1);
-    }
-    for (let r = 0; r < rows; r++) {
-      const f0 = r * (cols + 1) + cols, f1 = (r + 1) * (cols + 1) + cols;
-      const b0 = backOffset + r * (cols + 1) + cols, b1 = backOffset + (r + 1) * (cols + 1) + cols;
-      indices.push(f0, f1, b0); indices.push(f1, b1, b0);
-    }
+    const indices = [
+      // Frontal
+      0, 1, 2,  0, 2, 3,
+      // Traseira
+      4, 5, 6,  4, 6, 7,
+      // Topo
+      8, 9, 10,  8, 10, 11,
+      // Base
+      12, 13, 14,  12, 14, 15,
+      // Direita
+      16, 17, 18,  16, 18, 19,
+      // Esquerda
+      20, 21, 22,  20, 22, 23
+    ];
 
     const vertexCount = positions.length / 3;
     const indexCount = indices.length;
@@ -1351,7 +1339,7 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
     binBytes.set(imgArray, off);
 
     const gltf = {
-      asset: { version: '2.0', generator: 'AuraBurger Advanced Volumetric Extruder' },
+      asset: { version: '2.0', generator: 'AuraBurger Clean Volumetric Extruder' },
       scene: 0,
       scenes: [{ nodes: [0] }],
       nodes: [{ mesh: 0, name: 'FoodModel' }],
@@ -1368,10 +1356,10 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
         name: 'FoodMaterial',
         alphaMode: 'MASK',
         alphaCutoff: 0.1,
-        doubleSided: true,
+        doubleSided: false, // Back-face culling elimina sobreposição fantasma!
         pbrMetallicRoughness: {
           baseColorTexture: { index: 0 },
-          roughnessFactor: 0.65,
+          roughnessFactor: 0.70,
           metallicFactor: 0.0
         }
       }],
@@ -1380,7 +1368,7 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
       samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 }],
       accessors: [
         { bufferView: 0, componentType: 5123, count: indexCount, type: 'SCALAR' },
-        { bufferView: 1, componentType: 5126, count: vertexCount, max: [width / 2, height, depth / 2], min: [-width / 2, 0, -depth / 2], type: 'VEC3' },
+        { bufferView: 1, componentType: 5126, count: vertexCount, max: [w, h, d], min: [-w, 0, -d], type: 'VEC3' },
         { bufferView: 2, componentType: 5126, count: vertexCount, max: [1, 1, 1], min: [-1, -1, -1], type: 'VEC3' },
         { bufferView: 3, componentType: 5126, count: vertexCount, max: [1, 1], min: [0, 0], type: 'VEC2' }
       ],
@@ -1389,7 +1377,7 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
         { buffer: 0, byteOffset: indexBytes.length, byteLength: posBytes.length, target: 34962 },
         { buffer: 0, byteOffset: indexBytes.length + posBytes.length, byteLength: normBytes.length, target: 34962 },
         { buffer: 0, byteOffset: indexBytes.length + posBytes.length + normBytes.length, byteLength: uvBytes.length, target: 34962 },
-        { buffer: 0, byteOffset: indexBytes.length + posBytes.length + normBytes.length + uvBytes.length, byteLength: imageBytes.byteLength }
+        { buffer: 0, byteOffset: indexBytes.length + posBytes.length + normBytes.length, byteLength: imageBytes.byteLength }
       ],
       buffers: [{ byteLength: totalBinLength }]
     };
@@ -1448,14 +1436,14 @@ async function convertUploadedPhotoTo3D() {
   const viewer = document.getElementById('admin-preview-viewer');
 
   // Resolve as dimensões reais 1:1 conforme o formato do item
-  let width = 0.28, height = 0.18, depth = 0.085;
+  let width = 0.28, height = 0.18, depth = 0.04;
   let realScaleCm = '28.0 cm (Combo Completo na Mesa)';
 
   if (baseMesh === 'auto') {
     const ratio = state.detectedAspectRatio || 1.0;
-    if (ratio >= 1.25) {
+    if (ratio >= 1.05) {
       baseMesh = 'combo';
-    } else if (ratio <= 0.70) {
+    } else if (ratio <= 0.75) {
       baseMesh = 'drink';
     } else {
       baseMesh = 'burger';
@@ -1463,16 +1451,16 @@ async function convertUploadedPhotoTo3D() {
   }
 
   if (baseMesh === 'combo') {
-    width = 0.28; height = 0.18; depth = 0.085;
+    width = 0.28; height = 0.18; depth = 0.04;
     realScaleCm = '28.0 cm (Combo Completo na Mesa)';
   } else if (baseMesh === 'drink') {
-    width = 0.10; height = 0.22; depth = 0.08;
+    width = 0.10; height = 0.22; depth = 0.04;
     realScaleCm = '22.0 cm (Bebida / Garrafa Real)';
   } else if (baseMesh === 'fries') {
-    width = 0.18; height = 0.13; depth = 0.08;
-    realScaleCm = '18.0 cm (Porção Real)';
+    width = 0.18; height = 0.13; depth = 0.04;
+    realScaleCm = '18.0 cm (Porção Real na Mesa)';
   } else if (baseMesh === 'burger') {
-    width = 0.135; height = 0.11; depth = 0.135;
+    width = 0.14; height = 0.11; depth = 0.04;
     realScaleCm = '13.5 cm (Hambúrguer Individual Real)';
   }
 

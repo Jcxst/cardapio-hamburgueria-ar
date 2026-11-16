@@ -2,120 +2,76 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Constrói um modelo 3D GLB volumétrico com curvatura convexa e silhueta real a partir da foto.
- * Utiliza alphaMode: MASK para recortar qualquer fundo e gerar um volume 3D real com
- * profundidade, largura e altura calibradas em escala real 1:1 para mesa (ARCore/WebXR).
+ * Constrói um modelo 3D GLB volumétrico recortado diretamente da foto do produto.
+ * Utiliza alphaMode: MASK para recortar o fundo e doubleSided: false para evitar
+ * qualquer sobreposição fantasma (ghost double-vision) em Realidade Aumentada.
+ * A base é fixada perfeitamente plana em Y = 0 para ancorar na mesa com WebXR.
  */
-function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 0.18, depth = 0.085) {
-  const cols = 24, rows = 10;
-  const positions = [];
-  const uvs = [];
-  const normals = [];
-  const indices = [];
+function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 0.18, depth = 0.04) {
+  const w = width / 2;
+  const h = height;
+  const d = depth / 2;
 
-  // 1. Superfície frontal com curvatura convexa natural para alimentos
-  for (let r = 0; r <= rows; r++) {
-    const t = r / rows;
-    for (let c = 0; c <= cols; c++) {
-      const u = c / cols;
-      const x = (u - 0.5) * width;
-      const y = t * height;
-      const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
-      const z = (depth / 2) * (0.25 + 0.75 * bulge);
-      positions.push(x, y, z);
-      uvs.push(u, 1.0 - t);
+  // 24 vértices para um bloco tridimensional limpo e perfeitamente ancorado
+  const positions = [
+    // Face Frontal (Z = +d)
+    -w, 0,  d,   w, 0,  d,   w, h,  d,  -w, h,  d,
+    // Face Traseira (Z = -d, apontando para trás)
+    -w, 0, -d,  -w, h, -d,   w, h, -d,   w, 0, -d,
+    // Borda Superior (Topo)
+    -w, h,  d,   w, h,  d,   w, h, -d,  -w, h, -d,
+    // Borda Inferior (Apoiada na mesa em Y = 0)
+    -w, 0, -d,   w, 0, -d,   w, 0,  d,  -w, 0,  d,
+    // Borda Lateral Direita
+     w, 0,  d,   w, 0, -d,   w, h, -d,   w, h,  d,
+    // Borda Lateral Esquerda
+    -w, 0, -d,  -w, 0,  d,  -w, h,  d,  -w, h, -d
+  ];
 
-      // Normal com gradiente suave
-      const nx = -Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
-      const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
-      const nz = 0.9;
-      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-      normals.push(nx / len, ny / len, nz / len);
-    }
-  }
+  const normals = [
+    // Frontal
+    0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
+    // Traseira
+    0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1,
+    // Topo
+    0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
+    // Base (apoiada na mesa)
+    0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0,
+    // Direita
+    1, 0, 0,  1, 0, 0,  1, 0, 0,  1, 0, 0,
+    // Esquerda
+    -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0
+  ];
 
-  // Índices da face frontal
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const i0 = r * (cols + 1) + c;
-      const i1 = i0 + 1;
-      const i2 = (r + 1) * (cols + 1) + c;
-      const i3 = i2 + 1;
-      indices.push(i0, i1, i2);
-      indices.push(i1, i3, i2);
-    }
-  }
+  const uvs = [
+    // Frontal
+    0, 1,   1, 1,   1, 0,   0, 0,
+    // Traseira (espelhada)
+    1, 1,   1, 0,   0, 0,   0, 1,
+    // Topo
+    0, 0.02, 1, 0.02, 1, 0, 0, 0,
+    // Base
+    0, 1, 1, 1, 1, 0.98, 0, 0.98,
+    // Direita
+    0.98, 1, 1, 1, 1, 0, 0.98, 0,
+    // Esquerda
+    0, 1, 0.02, 1, 0.02, 0, 0, 0
+  ];
 
-  // 2. Superfície traseira (mirrored Z)
-  const backOffset = positions.length / 3;
-  for (let r = 0; r <= rows; r++) {
-    const t = r / rows;
-    for (let c = 0; c <= cols; c++) {
-      const u = c / cols;
-      const x = (u - 0.5) * width;
-      const y = t * height;
-      const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
-      const z = -(depth / 2) * (0.25 + 0.75 * bulge);
-      positions.push(x, y, z);
-      uvs.push(1.0 - u, 1.0 - t);
-
-      const nx = Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
-      const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
-      const nz = -0.9;
-      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-      normals.push(nx / len, ny / len, nz / len);
-    }
-  }
-
-  // Índices da face traseira
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const i0 = backOffset + r * (cols + 1) + c;
-      const i1 = i0 + 1;
-      const i2 = backOffset + (r + 1) * (cols + 1) + c;
-      const i3 = i2 + 1;
-      indices.push(i0, i2, i1);
-      indices.push(i1, i2, i3);
-    }
-  }
-
-  // 3. Bordas perimétricas fechando o volume 3D sólido (topo, base, esquerda, direita)
-  // Topo
-  for (let c = 0; c < cols; c++) {
-    const f0 = rows * (cols + 1) + c;
-    const f1 = f0 + 1;
-    const b0 = backOffset + rows * (cols + 1) + c;
-    const b1 = b0 + 1;
-    indices.push(f0, f1, b0);
-    indices.push(f1, b1, b0);
-  }
-  // Base (apoiada na mesa em Y = 0)
-  for (let c = 0; c < cols; c++) {
-    const f0 = c;
-    const f1 = c + 1;
-    const b0 = backOffset + c;
-    const b1 = b0 + 1;
-    indices.push(f0, b0, f1);
-    indices.push(f1, b0, b1);
-  }
-  // Lateral esquerda
-  for (let r = 0; r < rows; r++) {
-    const f0 = r * (cols + 1);
-    const f1 = (r + 1) * (cols + 1);
-    const b0 = backOffset + r * (cols + 1);
-    const b1 = backOffset + (r + 1) * (cols + 1);
-    indices.push(f0, b0, f1);
-    indices.push(f1, b0, b1);
-  }
-  // Lateral direita
-  for (let r = 0; r < rows; r++) {
-    const f0 = r * (cols + 1) + cols;
-    const f1 = (r + 1) * (cols + 1) + cols;
-    const b0 = backOffset + r * (cols + 1) + cols;
-    const b1 = backOffset + (r + 1) * (cols + 1) + cols;
-    indices.push(f0, f1, b0);
-    indices.push(f1, b1, b0);
-  }
+  const indices = [
+    // Frontal
+    0, 1, 2,  0, 2, 3,
+    // Traseira
+    4, 5, 6,  4, 6, 7,
+    // Topo
+    8, 9, 10,  8, 10, 11,
+    // Base
+    12, 13, 14,  12, 14, 15,
+    // Direita
+    16, 17, 18,  16, 18, 19,
+    // Esquerda
+    20, 21, 22,  20, 22, 23
+  ];
 
   const vertexCount = positions.length / 3;
 
@@ -147,10 +103,10 @@ function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 
   const binBuf = Buffer.concat([indexBuf, posBuf, normBuf, uvBuf, imgBuf]);
 
   const gltf = {
-    asset: { version: '2.0', generator: 'AuraBurger Advanced Volumetric Extruder' },
+    asset: { version: '2.0', generator: 'AuraBurger Clean Volumetric Extruder' },
     scene: 0,
     scenes: [{ nodes: [0] }],
-    nodes: [{ mesh: 0, name: 'VolumetricFoodItem' }],
+    nodes: [{ mesh: 0, name: 'FoodModel' }],
     meshes: [{
       name: 'ItemMesh',
       primitives: [{
@@ -168,10 +124,10 @@ function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 
       name: 'FoodMaterial',
       alphaMode: 'MASK',
       alphaCutoff: 0.1,
-      doubleSided: true,
+      doubleSided: false, // Evita sobreposição fantasma (ghost double-vision)
       pbrMetallicRoughness: {
         baseColorTexture: { index: 0 },
-        roughnessFactor: 0.65,
+        roughnessFactor: 0.70,
         metallicFactor: 0.0
       }
     }],
@@ -180,7 +136,7 @@ function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 
     samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 }],
     accessors: [
       { bufferView: 0, componentType: 5123, count: indices.length, type: 'SCALAR' },
-      { bufferView: 1, componentType: 5126, count: vertexCount, max: [width / 2, height, depth / 2], min: [-width / 2, 0, -depth / 2], type: 'VEC3' },
+      { bufferView: 1, componentType: 5126, count: vertexCount, max: [w, h, d], min: [-w, 0, -d], type: 'VEC3' },
       { bufferView: 2, componentType: 5126, count: vertexCount, max: [1, 1, 1], min: [-1, -1, -1], type: 'VEC3' },
       { bufferView: 3, componentType: 5126, count: vertexCount, max: [1, 1], min: [0, 0], type: 'VEC2' }
     ],
@@ -228,20 +184,20 @@ function generate3DFromPhoto(imageBuffer, mimeType, outFilename, baseModelType =
   const finalPath = path.join(outDir, outFilename);
 
   // Calibra as dimensões reais 1:1 conforme o tipo do item
-  let width = 0.28, height = 0.18, depth = 0.085;
+  let width = 0.28, height = 0.18, depth = 0.04;
 
   if (baseModelType === 'combo') {
-    width = 0.28; height = 0.18; depth = 0.085;
+    width = 0.28; height = 0.18; depth = 0.04;
   } else if (baseModelType === 'fries') {
-    width = 0.18; height = 0.13; depth = 0.08;
+    width = 0.18; height = 0.13; depth = 0.04;
   } else if (baseModelType === 'drink') {
-    width = 0.10; height = 0.22; depth = 0.08;
+    width = 0.10; height = 0.22; depth = 0.04;
   } else if (baseModelType === 'burger') {
-    width = 0.135; height = 0.11; depth = 0.135;
+    width = 0.14; height = 0.11; depth = 0.04;
   } else if (dimensions) {
     width = dimensions.width || 0.28;
     height = dimensions.height || 0.18;
-    depth = dimensions.depth || 0.085;
+    depth = dimensions.depth || 0.04;
   }
 
   // Gera o modelo 3D volumétrico que segue a foto
