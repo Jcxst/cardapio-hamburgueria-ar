@@ -276,7 +276,7 @@ const server = http.createServer(async (req, res) => {
   // =========================================================================
   if (parsedUrl.pathname === '/api/admin/convert-3d' && req.method === 'POST') {
     try {
-      const { imageBase64, mimeType, baseModel = 'smash', title = 'Novo Burger' } = await parseJsonBody(req);
+      const { imageBase64, mimeType, baseModel = 'auto', title = 'Novo Produto', dimensions } = await parseJsonBody(req);
       
       if (!imageBase64) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -284,12 +284,12 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      // Limpa prefixo data:image/jpeg;base64, se presente
+      // Limpa prefixo data:image/...;base64, se presente
       const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = Buffer.from(cleanBase64, 'base64');
       const ext = (mimeType && mimeType.includes('png')) ? 'png' : 'jpg';
 
-      const fileId = 'burger_' + Date.now();
+      const fileId = 'item_' + Date.now();
       const imageFilename = `${fileId}.${ext}`;
       const glbFilename = `${fileId}.glb`;
 
@@ -299,18 +299,25 @@ const server = http.createServer(async (req, res) => {
       fs.writeFileSync(path.join(uploadDir, imageFilename), imageBuffer);
       const imageUrl = `assets/uploads/${imageFilename}`;
 
-      // 2. Converte a foto 2D no modelo 3D GLB calibrado com dimensões reais 1:1
-      const modelGlbUrl = generate3DFromPhoto(imageBuffer, mimeType || 'image/jpeg', glbFilename, baseModel);
+      // 2. Converte a foto no modelo 3D GLB volumétrico recortado que segue o formato real do item
+      const modelGlbUrl = generate3DFromPhoto(imageBuffer, mimeType || 'image/png', glbFilename, baseModel, dimensions);
 
-      console.log(`✨ Foto convertida em 3D com sucesso: ${modelGlbUrl}`);
+      let scaleDesc = '28.0 cm (Combo Real na Mesa)';
+      if (baseModel === 'combo') scaleDesc = '28.0 cm (Combo Real na Mesa)';
+      else if (baseModel === 'drink') scaleDesc = '22.0 cm (Bebida / Garrafa)';
+      else if (baseModel === 'fries') scaleDesc = '18.0 cm (Porção Real)';
+      else if (baseModel === 'burger') scaleDesc = '13.5 cm (Hambúrguer Individual Real)';
+      else if (dimensions && dimensions.width) scaleDesc = `${(dimensions.width * 100).toFixed(1)} cm (Escala 1:1 Real)`;
+
+      console.log(`✨ Modelo 3D gerado com sucesso [${baseModel}]: ${modelGlbUrl}`);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
         imageUrl,
         modelGlbUrl,
-        realScaleCm: '13.5 cm (Escala 1:1 Real)',
-        message: 'Modelo 3D gerado com sucesso a partir da foto!'
+        realScaleCm: scaleDesc,
+        message: 'Modelo 3D gerado com sucesso no formato do item fotografado!'
       }));
     } catch (err) {
       console.error('Erro na geração 3D:', err);

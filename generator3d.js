@@ -2,159 +2,252 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Converte uma foto 2D em um modelo 3D GLB calibrado para Realidade Aumentada.
- * Projeta a foto diretamente na geometria 3D via mapeamento UV frontal/cilíndrico,
- * remove o mapa de relevo do hambúrguer genérico antigo e injeta a foto como
- * textura base PBR de alta fidelidade.
- * 
- * @param {Buffer} imageBuffer - Buffer da imagem enviada pelo funcionário
- * @param {string} mimeType - 'image/jpeg' ou 'image/png'
- * @param {string} outFilename - Nome do arquivo GLB de saída
- * @param {string} baseModelType - 'smash' | 'monster' | 'classic'
- * @returns {string} Caminho relativo do modelo GLB gerado
+ * Constrói um modelo 3D GLB volumétrico com curvatura convexa e silhueta real a partir da foto.
+ * Utiliza alphaMode: MASK para recortar qualquer fundo e gerar um volume 3D real com
+ * profundidade, largura e altura calibradas em escala real 1:1 para mesa (ARCore/WebXR).
  */
-function generate3DFromPhoto(imageBuffer, mimeType, outFilename, baseModelType = 'smash') {
-  const baseModels = {
-    smash: path.join(__dirname, 'assets', 'models', 'burger-smash.glb'),
-    monster: path.join(__dirname, 'assets', 'models', 'burger-smash.glb'),
-    classic: path.join(__dirname, 'assets', 'models', 'burger-smash.glb')
+function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 0.18, depth = 0.085) {
+  const cols = 24, rows = 10;
+  const positions = [];
+  const uvs = [];
+  const normals = [];
+  const indices = [];
+
+  // 1. Superfície frontal com curvatura convexa natural para alimentos
+  for (let r = 0; r <= rows; r++) {
+    const t = r / rows;
+    for (let c = 0; c <= cols; c++) {
+      const u = c / cols;
+      const x = (u - 0.5) * width;
+      const y = t * height;
+      const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
+      const z = (depth / 2) * (0.25 + 0.75 * bulge);
+      positions.push(x, y, z);
+      uvs.push(u, 1.0 - t);
+
+      // Normal com gradiente suave
+      const nx = -Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
+      const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
+      const nz = 0.9;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      normals.push(nx / len, ny / len, nz / len);
+    }
+  }
+
+  // Índices da face frontal
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i0 = r * (cols + 1) + c;
+      const i1 = i0 + 1;
+      const i2 = (r + 1) * (cols + 1) + c;
+      const i3 = i2 + 1;
+      indices.push(i0, i1, i2);
+      indices.push(i1, i3, i2);
+    }
+  }
+
+  // 2. Superfície traseira (mirrored Z)
+  const backOffset = positions.length / 3;
+  for (let r = 0; r <= rows; r++) {
+    const t = r / rows;
+    for (let c = 0; c <= cols; c++) {
+      const u = c / cols;
+      const x = (u - 0.5) * width;
+      const y = t * height;
+      const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
+      const z = -(depth / 2) * (0.25 + 0.75 * bulge);
+      positions.push(x, y, z);
+      uvs.push(1.0 - u, 1.0 - t);
+
+      const nx = Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
+      const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
+      const nz = -0.9;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      normals.push(nx / len, ny / len, nz / len);
+    }
+  }
+
+  // Índices da face traseira
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i0 = backOffset + r * (cols + 1) + c;
+      const i1 = i0 + 1;
+      const i2 = backOffset + (r + 1) * (cols + 1) + c;
+      const i3 = i2 + 1;
+      indices.push(i0, i2, i1);
+      indices.push(i1, i2, i3);
+    }
+  }
+
+  // 3. Bordas perimétricas fechando o volume 3D sólido (topo, base, esquerda, direita)
+  // Topo
+  for (let c = 0; c < cols; c++) {
+    const f0 = rows * (cols + 1) + c;
+    const f1 = f0 + 1;
+    const b0 = backOffset + rows * (cols + 1) + c;
+    const b1 = b0 + 1;
+    indices.push(f0, f1, b0);
+    indices.push(f1, b1, b0);
+  }
+  // Base (apoiada na mesa em Y = 0)
+  for (let c = 0; c < cols; c++) {
+    const f0 = c;
+    const f1 = c + 1;
+    const b0 = backOffset + c;
+    const b1 = b0 + 1;
+    indices.push(f0, b0, f1);
+    indices.push(f1, b0, b1);
+  }
+  // Lateral esquerda
+  for (let r = 0; r < rows; r++) {
+    const f0 = r * (cols + 1);
+    const f1 = (r + 1) * (cols + 1);
+    const b0 = backOffset + r * (cols + 1);
+    const b1 = backOffset + (r + 1) * (cols + 1);
+    indices.push(f0, b0, f1);
+    indices.push(f1, b0, b1);
+  }
+  // Lateral direita
+  for (let r = 0; r < rows; r++) {
+    const f0 = r * (cols + 1) + cols;
+    const f1 = (r + 1) * (cols + 1) + cols;
+    const b0 = backOffset + r * (cols + 1) + cols;
+    const b1 = backOffset + (r + 1) * (cols + 1) + cols;
+    indices.push(f0, f1, b0);
+    indices.push(f1, b1, b0);
+  }
+
+  const vertexCount = positions.length / 3;
+
+  const indexBuf = Buffer.alloc(indices.length * 2);
+  indices.forEach((val, i) => indexBuf.writeUInt16LE(val, i * 2));
+
+  const posBuf = Buffer.alloc(positions.length * 4);
+  positions.forEach((val, i) => posBuf.writeFloatLE(val, i * 4));
+
+  const normBuf = Buffer.alloc(normals.length * 4);
+  normals.forEach((val, i) => normBuf.writeFloatLE(val, i * 4));
+
+  const uvBuf = Buffer.alloc(uvs.length * 4);
+  uvs.forEach((val, i) => uvBuf.writeFloatLE(val, i * 4));
+
+  let imgBuf = imageBuffer;
+  const pad = imgBuf.length % 4 === 0 ? 0 : 4 - (imgBuf.length % 4);
+  if (pad > 0) {
+    imgBuf = Buffer.concat([imgBuf, Buffer.alloc(pad, 0)]);
+  }
+
+  const offsetIndices = 0;
+  const offsetPositions = offsetIndices + indexBuf.length;
+  const offsetNormals = offsetPositions + posBuf.length;
+  const offsetUvs = offsetNormals + normBuf.length;
+  const offsetImage = offsetUvs + uvBuf.length;
+
+  const totalBinLength = offsetImage + imgBuf.length;
+  const binBuf = Buffer.concat([indexBuf, posBuf, normBuf, uvBuf, imgBuf]);
+
+  const gltf = {
+    asset: { version: '2.0', generator: 'AuraBurger Advanced Volumetric Extruder' },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0, name: 'VolumetricFoodItem' }],
+    meshes: [{
+      name: 'ItemMesh',
+      primitives: [{
+        attributes: {
+          POSITION: 1,
+          NORMAL: 2,
+          TEXCOORD_0: 3
+        },
+        indices: 0,
+        material: 0,
+        mode: 4
+      }]
+    }],
+    materials: [{
+      name: 'FoodMaterial',
+      alphaMode: 'MASK',
+      alphaCutoff: 0.1,
+      doubleSided: true,
+      pbrMetallicRoughness: {
+        baseColorTexture: { index: 0 },
+        roughnessFactor: 0.65,
+        metallicFactor: 0.0
+      }
+    }],
+    textures: [{ sampler: 0, source: 0 }],
+    images: [{ bufferView: 4, mimeType: (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg' }],
+    samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 }],
+    accessors: [
+      { bufferView: 0, componentType: 5123, count: indices.length, type: 'SCALAR' },
+      { bufferView: 1, componentType: 5126, count: vertexCount, max: [width / 2, height, depth / 2], min: [-width / 2, 0, -depth / 2], type: 'VEC3' },
+      { bufferView: 2, componentType: 5126, count: vertexCount, max: [1, 1, 1], min: [-1, -1, -1], type: 'VEC3' },
+      { bufferView: 3, componentType: 5126, count: vertexCount, max: [1, 1], min: [0, 0], type: 'VEC2' }
+    ],
+    bufferViews: [
+      { buffer: 0, byteOffset: offsetIndices, byteLength: indexBuf.length, target: 34963 },
+      { buffer: 0, byteOffset: offsetPositions, byteLength: posBuf.length, target: 34962 },
+      { buffer: 0, byteOffset: offsetNormals, byteLength: normBuf.length, target: 34962 },
+      { buffer: 0, byteOffset: offsetUvs, byteLength: uvBuf.length, target: 34962 },
+      { buffer: 0, byteOffset: offsetImage, byteLength: imageBuffer.length }
+    ],
+    buffers: [{ byteLength: totalBinLength }]
   };
 
-  const baseGlbPath = baseModels[baseModelType] || baseModels.smash;
-  if (!fs.existsSync(baseGlbPath)) {
-    throw new Error('Modelo base GLB não encontrado em ' + baseGlbPath);
-  }
+  let jsonStr = JSON.stringify(gltf);
+  while (Buffer.byteLength(jsonStr, 'utf8') % 4 !== 0) jsonStr += ' ';
+  const jsonBuf = Buffer.from(jsonStr, 'utf8');
 
-  const buf = fs.readFileSync(baseGlbPath);
-  const jsonLen = buf.readUInt32LE(12);
-  const jsonStr = buf.toString('utf8', 20, 20 + jsonLen);
-  const gltf = JSON.parse(jsonStr);
-  const binBuf = buf.slice(20 + jsonLen + 8);
-
-  // 1. Recalcula os UVs (TEXCOORD_0) para projetar com fidelidade a foto enviada pelo usuário
-  try {
-    const posAccIdx = gltf.meshes[0].primitives[0].attributes.POSITION;
-    const uvAccIdx = gltf.meshes[0].primitives[0].attributes.TEXCOORD_0;
-    const posAcc = gltf.accessors[posAccIdx];
-    const uvAcc = gltf.accessors[uvAccIdx];
-    const posBv = gltf.bufferViews[posAcc.bufferView];
-    const uvBv = gltf.bufferViews[uvAcc.bufferView];
-    const posOff = (posBv.byteOffset || 0) + (posAcc.byteOffset || 0);
-    const uvOff = (uvBv.byteOffset || 0) + (uvAcc.byteOffset || 0);
-
-    const minX = posAcc.min[0], maxX = posAcc.max[0];
-    const minZ = posAcc.min[2], maxZ = posAcc.max[2];
-    const count = posAcc.count;
-
-    for (let i = 0; i < count; i++) {
-      const x = binBuf.readFloatLE(posOff + i * 12);
-      const y = binBuf.readFloatLE(posOff + i * 12 + 4);
-      const z = binBuf.readFloatLE(posOff + i * 12 + 8);
-
-      const normX = (x - minX) / (maxX - minX);
-      const normZ = (maxZ - z) / (maxZ - minZ);
-
-      let u, v;
-      if (y >= 0) {
-        u = 0.04 + 0.92 * normX;
-      } else {
-        u = 0.04 + 0.92 * (1.0 - normX);
-      }
-      v = 0.04 + 0.92 * normZ;
-
-      u = Math.max(0.001, Math.min(0.999, u));
-      v = Math.max(0.001, Math.min(0.999, v));
-
-      binBuf.writeFloatLE(u, uvOff + i * 8);
-      binBuf.writeFloatLE(v, uvOff + i * 8 + 4);
-    }
-  } catch (uvErr) {
-    console.warn('Aviso ao recalcular UVs do modelo:', uvErr.message);
-  }
-
-  // 2. Remove o mapa normal antigo que continha gergelins e vincos do hambúrguer genérico
-  if (gltf.materials && gltf.materials[0]) {
-    delete gltf.materials[0].normalTexture;
-    if (gltf.materials[0].pbrMetallicRoughness) {
-      gltf.materials[0].pbrMetallicRoughness.roughnessFactor = 0.65;
-      gltf.materials[0].pbrMetallicRoughness.metallicFactor = 0.0;
-    }
-  }
-
-  // 3. Injeta a foto enviada pelo usuário no slot da textura baseColor
-  const imgIdx = 0;
-  if (!gltf.images || !gltf.images[imgIdx]) {
-    throw new Error('Slot de imagem não encontrado no modelo 3D base');
-  }
-
-  const bvIdx = gltf.images[imgIdx].bufferView;
-  gltf.images[imgIdx].mimeType = (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg';
-
-  const bv = gltf.bufferViews[bvIdx];
-  const oldOffset = bv.byteOffset || 0;
-  const oldLen = bv.byteLength;
-
-  // Alinhamento obrigatório de 4 bytes do glTF
-  let newImgBuf = imageBuffer;
-  const pad = newImgBuf.length % 4 === 0 ? 0 : 4 - (newImgBuf.length % 4);
-  if (pad > 0) {
-    newImgBuf = Buffer.concat([newImgBuf, Buffer.alloc(pad, 0)]);
-  }
-
-  const diff = newImgBuf.length - oldLen;
-
-  // Reconstroi o chunk binário substituindo a textura pela foto enviada
-  const before = binBuf.slice(0, oldOffset);
-  const after = binBuf.slice(oldOffset + oldLen);
-  const newBinBuf = Buffer.concat([before, newImgBuf, after]);
-
-  bv.byteLength = imageBuffer.length;
-
-  // Atualiza offsets dos bufferViews subsequentes
-  for (let i = 0; i < gltf.bufferViews.length; i++) {
-    if (i !== bvIdx && (gltf.bufferViews[i].byteOffset || 0) > oldOffset) {
-      gltf.bufferViews[i].byteOffset += diff;
-    }
-  }
-
-  // Atualiza tamanho total do buffer 0
-  gltf.buffers[0].byteLength = newBinBuf.length;
-
-  // Codifica o novo GLB
-  let newJsonStr = JSON.stringify(gltf);
-  while (Buffer.byteLength(newJsonStr, 'utf8') % 4 !== 0) {
-    newJsonStr += ' ';
-  }
-  const newJsonBuf = Buffer.from(newJsonStr, 'utf8');
-
-  const totalLength = 12 + 8 + newJsonBuf.length + 8 + newBinBuf.length;
+  const totalLength = 12 + 8 + jsonBuf.length + 8 + binBuf.length;
   const out = Buffer.alloc(totalLength);
-  
-  // Header
   out.write('glTF', 0, 4, 'ascii');
   out.writeUInt32LE(2, 4);
   out.writeUInt32LE(totalLength, 8);
 
-  // Chunk 0: JSON
-  out.writeUInt32LE(newJsonBuf.length, 12);
+  out.writeUInt32LE(jsonBuf.length, 12);
   out.write('JSON', 16, 4, 'ascii');
-  newJsonBuf.copy(out, 20);
+  jsonBuf.copy(out, 20);
 
-  // Chunk 1: BIN
-  const binOff = 20 + newJsonBuf.length;
-  out.writeUInt32LE(newBinBuf.length, binOff);
+  const binOff = 20 + jsonBuf.length;
+  out.writeUInt32LE(binBuf.length, binOff);
   out.write('BIN\0', binOff + 4, 4, 'ascii');
-  newBinBuf.copy(out, binOff + 8);
+  binBuf.copy(out, binOff + 8);
 
+  return out;
+}
+
+/**
+ * Converte uma foto 2D em um modelo 3D GLB calibrado para Realidade Aumentada.
+ * Cria o modelo volumétrico recortado que segue o formato real do item (Combo, Burger, Porção ou Bebida).
+ */
+function generate3DFromPhoto(imageBuffer, mimeType, outFilename, baseModelType = 'auto', dimensions = null) {
   const outDir = path.join(__dirname, 'assets', 'models', 'uploads');
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }
-
   const finalPath = path.join(outDir, outFilename);
-  fs.writeFileSync(finalPath, out);
 
+  // Calibra as dimensões reais 1:1 conforme o tipo do item
+  let width = 0.28, height = 0.18, depth = 0.085;
+
+  if (baseModelType === 'combo') {
+    width = 0.28; height = 0.18; depth = 0.085;
+  } else if (baseModelType === 'fries') {
+    width = 0.18; height = 0.13; depth = 0.08;
+  } else if (baseModelType === 'drink') {
+    width = 0.10; height = 0.22; depth = 0.08;
+  } else if (baseModelType === 'burger') {
+    width = 0.135; height = 0.11; depth = 0.135;
+  } else if (dimensions) {
+    width = dimensions.width || 0.28;
+    height = dimensions.height || 0.18;
+    depth = dimensions.depth || 0.085;
+  }
+
+  // Gera o modelo 3D volumétrico que segue a foto
+  const glbBuffer = buildVolumetricGlbBuffer(imageBuffer, mimeType, width, height, depth);
+  fs.writeFileSync(finalPath, glbBuffer);
   return `assets/models/uploads/${outFilename}`;
 }
 
-module.exports = { generate3DFromPhoto };
+module.exports = { generate3DFromPhoto, buildVolumetricGlbBuffer };

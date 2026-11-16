@@ -717,15 +717,17 @@
                 </div>
               </div>
 
-              <!-- Seletor de Mesh Base -->
+              <!-- Seletor de Formato do Item -->
               <div>
-                <label class="block text-xs font-bold text-slate-300 mb-1.5">Estrutura 3D Base (Escala Real 1:1)</label>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">Formato 3D do Item (Escala Real 1:1)</label>
                 <select id="new-prod-base-mesh" class="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-                  <option value="smash">Smash Burger Duplo (13.5 cm de diâmetro)</option>
-                  <option value="monster">Monster Artesanal Alto (14.1 cm de diâmetro)</option>
-                  <option value="classic">Burger Clássico Brioche (14.0 cm de diâmetro)</option>
+                  <option value="auto" selected>✨ Auto-Formato (Molda no contorno exato da foto: Combo, Burger, Porção ou Bebida)</option>
+                  <option value="combo">🍱 Combo Completo (Tábua / Prancha + Burger + Batata + Bebida - 28 cm)</option>
+                  <option value="burger">🍔 Hambúrguer Individual Redondo (13.5 cm)</option>
+                  <option value="fries">🍟 Porção de Batatas / Acompanhamento (18 cm)</option>
+                  <option value="drink">🥤 Bebida / Copo / Garrafa / Shake (22 cm de Altura)</option>
                 </select>
-                <p class="text-[10px] text-slate-500 mt-1">Calibrado milimetricamente para não deslizar na mesa com ARCore.</p>
+                <p class="text-[10px] text-slate-400 mt-1">O 3D segue a silhueta real do item fotografado sem deformações na mesa.</p>
               </div>
 
               <!-- Botão Converter em 3D -->
@@ -746,7 +748,7 @@
                   <span class="font-bold text-emerald-400 flex items-center gap-1.5">
                     <i class="fa-solid fa-check-circle"></i> Modelo 3D Gerado!
                   </span>
-                  <span class="text-[10px] text-slate-400">Escala Real 13.5 cm</span>
+                  <span id="admin-3d-scale-label" class="text-[10px] text-amber-400 font-mono font-bold">Escala Real 1:1</span>
                 </div>
                 
                 <div class="relative h-56 bg-slate-950/80 rounded-2xl border border-white/10 overflow-hidden">

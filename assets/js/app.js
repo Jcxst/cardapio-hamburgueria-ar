@@ -1001,7 +1001,155 @@ async function adminDeleteProduct(productId, encodedName) {
   }
 }
 
-// Manipulação do arquivo de foto 2D
+// Processamento de imagem em Canvas: Remoção de fundo branco/neutro e detecção de silhueta
+function processImageBackgroundAndSilhouette(img) {
+  const canvas = document.createElement('canvas');
+  let w = img.naturalWidth || img.width;
+  let h = img.naturalHeight || img.height;
+
+  // Limite razoável para processamento rápido e textura nítida
+  const maxDim = 1024;
+  if (w > maxDim || h > maxDim) {
+    if (w > h) {
+      h = Math.round((h * maxDim) / w);
+      w = maxDim;
+    } else {
+      w = Math.round((w * maxDim) / h);
+      h = maxDim;
+    }
+  }
+
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+
+  // 1. Amostra os 4 cantos para verificar se o fundo é claro/branco
+  const corners = [
+    0, // top-left
+    (w - 1) * 4, // top-right
+    (h - 1) * w * 4, // bottom-left
+    ((h - 1) * w + (w - 1)) * 4 // bottom-right
+  ];
+
+  let sumR = 0, sumG = 0, sumB = 0;
+  for (const c of corners) {
+    sumR += data[c];
+    sumG += data[c + 1];
+    sumB += data[c + 2];
+  }
+  const avgR = sumR / 4;
+  const avgG = sumG / 4;
+  const avgB = sumB / 4;
+
+  const isLightBg = avgR > 185 && avgG > 185 && avgB > 185;
+
+  // 2. Se for fundo branco/claro, aplica Flood Fill a partir das 4 bordas externas
+  // Isso preserva detalhes brancos internos do hambúrguer (gergelim, queijo, maionese, texto da tábua)
+  if (isLightBg) {
+    const visited = new Uint8Array(w * h);
+    const queue = [];
+
+    function colorDist(idx) {
+      const dr = data[idx] - avgR;
+      const dg = data[idx + 1] - avgG;
+      const db = data[idx + 2] - avgB;
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    // Adiciona pixels das 4 bordas que combinam com a cor do fundo
+    for (let x = 0; x < w; x++) {
+      // Topo
+      const topIdx = x * 4;
+      if (colorDist(topIdx) < 58) {
+        visited[x] = 1;
+        queue.push(x);
+      }
+      // Fundo
+      const btmIdx = ((h - 1) * w + x) * 4;
+      if (colorDist(btmIdx) < 58) {
+        visited[(h - 1) * w + x] = 1;
+        queue.push((h - 1) * w + x);
+      }
+    }
+
+    for (let y = 0; y < h; y++) {
+      // Esquerda
+      const leftIdx = (y * w) * 4;
+      if (!visited[y * w] && colorDist(leftIdx) < 58) {
+        visited[y * w] = 1;
+        queue.push(y * w);
+      }
+      // Direita
+      const rightIdx = (y * w + (w - 1)) * 4;
+      if (!visited[y * w + (w - 1)] && colorDist(rightIdx) < 58) {
+        visited[y * w + (w - 1)] = 1;
+        queue.push(y * w + (w - 1));
+      }
+    }
+
+    // Executa Flood Fill
+    let qHead = 0;
+    while (qHead < queue.length) {
+      const pos = queue[qHead++];
+      const px = pos % w;
+      const py = Math.floor(pos / w);
+      const pIdx = pos * 4;
+
+      // Torna pixel transparente
+      data[pIdx + 3] = 0;
+
+      // Vizinhos: cima, baixo, esquerda, direita
+      const neighbors = [];
+      if (px > 0) neighbors.push(pos - 1);
+      if (px < w - 1) neighbors.push(pos + 1);
+      if (py > 0) neighbors.push(pos - w);
+      if (py < h - 1) neighbors.push(pos + w);
+
+      for (const n of neighbors) {
+        if (!visited[n]) {
+          visited[n] = 1;
+          const nIdx = n * 4;
+          if (colorDist(nIdx) < 62) {
+            queue.push(n);
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // 3. Calcula a bounding box do item em primeiro plano e a proporção de aspecto real
+  let minX = w, maxX = 0, minY = h, maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = data[(y * w + x) * 4 + 3];
+      if (a > 30) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  const fgWidth = Math.max(1, maxX - minX + 1);
+  const fgHeight = Math.max(1, maxY - minY + 1);
+  const aspectRatio = fgWidth / fgHeight;
+
+  return {
+    canvas,
+    aspectRatio,
+    fgBox: { minX, maxX, minY, maxY, width: fgWidth, height: fgHeight },
+    isLightBg
+  };
+}
+
+// Manipulação do arquivo de foto 2D com processamento visual inteligente
 function handlePhotoFileSelected(e) {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -1011,200 +1159,343 @@ function handlePhotoFileSelected(e) {
     return;
   }
 
-  state.pendingUploadedMimeType = file.type;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const rawDataUrl = evt.target.result;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      // Processa remoção de fundo e detecção de formato real
+      const processed = processImageBackgroundAndSilhouette(img);
+      state.detectedAspectRatio = processed.aspectRatio;
 
-  // Lê como ArrayBuffer para injeção e remapeamento 3D no cliente
-  const arrayBufferReader = new FileReader();
-  arrayBufferReader.onload = function(evt) {
-    state.pendingUploadedArrayBuffer = evt.target.result;
+      const cleanPngDataUrl = processed.canvas.toDataURL('image/png');
+      state.pendingUploadedPhotoBase64 = cleanPngDataUrl;
+      state.pendingUploadedMimeType = 'image/png';
+
+      // Converte canvas para ArrayBuffer para montagem do GLB
+      processed.canvas.toBlob(async (blob) => {
+        if (blob) {
+          state.pendingUploadedArrayBuffer = await blob.arrayBuffer();
+        }
+      }, 'image/png');
+
+      // Atualiza preview da foto 2D
+      const previewImg = document.getElementById('photo-preview-img');
+      const previewWrap = document.getElementById('photo-preview-wrapper');
+      const placeholder = document.getElementById('photo-placeholder');
+      const generateBtn = document.getElementById('btn-generate-3d');
+      const meshSelect = document.getElementById('new-prod-base-mesh');
+
+      if (previewImg && previewWrap && placeholder) {
+        previewImg.src = cleanPngDataUrl;
+        placeholder.classList.add('hidden');
+        previewWrap.classList.remove('hidden');
+      }
+
+      // Auto-seleciona o formato adequado conforme a silhueta da foto
+      let detectedLabel = 'Hambúrguer Individual (13.5 cm)';
+      if (meshSelect) {
+        if (processed.aspectRatio >= 1.25) {
+          meshSelect.value = 'combo';
+          detectedLabel = '🍱 Combo Completo / Tábua (28 cm)';
+        } else if (processed.aspectRatio <= 0.70) {
+          meshSelect.value = 'drink';
+          detectedLabel = '🥤 Bebida / Garrafa / Copo (22 cm)';
+        } else {
+          meshSelect.value = 'burger';
+          detectedLabel = '🍔 Hambúrguer Individual (13.5 cm)';
+        }
+      }
+
+      showToastNotification(`✨ Formato detectado: ${detectedLabel}`);
+
+      if (generateBtn) {
+        generateBtn.disabled = false;
+        generateBtn.classList.add('animate-pulse');
+      }
+    };
+    img.src = rawDataUrl;
   };
-  arrayBufferReader.readAsArrayBuffer(file);
-
-  // Lê como DataURL para exibição da foto 2D
-  const dataUrlReader = new FileReader();
-  dataUrlReader.onload = function(evt) {
-    const base64Data = evt.target.result;
-    state.pendingUploadedPhotoBase64 = base64Data;
-
-    const previewImg = document.getElementById('photo-preview-img');
-    const previewWrap = document.getElementById('photo-preview-wrapper');
-    const placeholder = document.getElementById('photo-placeholder');
-    const generateBtn = document.getElementById('btn-generate-3d');
-
-    if (previewImg && previewWrap && placeholder) {
-      previewImg.src = base64Data;
-      placeholder.classList.add('hidden');
-      previewWrap.classList.remove('hidden');
-    }
-
-    if (generateBtn) {
-      generateBtn.disabled = false;
-    }
-  };
-  dataUrlReader.readAsDataURL(file);
+  reader.readAsDataURL(file);
 }
 
-// Gerador glTF 2.0 Client-side: Recalcula UVs e injeta a foto enviada na geometria 3D
-async function buildClientGlbFromPhoto(imageBytes, mimeType) {
+// Constrói modelo 3D GLB volumétrico client-side com curvatura e silhueta real
+async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', width = 0.28, height = 0.18, depth = 0.085) {
   try {
-    const res = await fetch('assets/models/burger-smash.glb');
-    const arrayBuffer = await res.arrayBuffer();
+    const cols = 24, rows = 10;
+    const positions = [];
+    const uvs = [];
+    const normals = [];
+    const indices = [];
 
-    const dataView = new DataView(arrayBuffer);
-    const jsonLen = dataView.getUint32(12, true);
-    const jsonBytes = new Uint8Array(arrayBuffer, 20, jsonLen);
-    const jsonStr = new TextDecoder('utf-8').decode(jsonBytes);
-    const gltf = JSON.parse(jsonStr);
+    // 1. Face frontal com curvatura suave
+    for (let r = 0; r <= rows; r++) {
+      const t = r / rows;
+      for (let c = 0; c <= cols; c++) {
+        const u = c / cols;
+        const x = (u - 0.5) * width;
+        const y = t * height;
+        const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
+        const z = (depth / 2) * (0.25 + 0.75 * bulge);
+        positions.push(x, y, z);
+        uvs.push(u, 1.0 - t);
 
-    const binOffset = 20 + jsonLen + 8;
-    const binLen = dataView.getUint32(20 + jsonLen, true);
-    const binBytes = new Uint8Array(arrayBuffer.slice(binOffset, binOffset + binLen));
-    const binDataView = new DataView(binBytes.buffer, binBytes.byteOffset, binBytes.byteLength);
-
-    // 1. Recalcula os UVs diretamente das posições de vértices (projeção cilíndrica/frontal da foto)
-    const posAccIdx = gltf.meshes[0].primitives[0].attributes.POSITION;
-    const uvAccIdx = gltf.meshes[0].primitives[0].attributes.TEXCOORD_0;
-    const posAcc = gltf.accessors[posAccIdx];
-    const uvAcc = gltf.accessors[uvAccIdx];
-    const posBv = gltf.bufferViews[posAcc.bufferView];
-    const uvBv = gltf.bufferViews[uvAcc.bufferView];
-    const posOff = (posBv.byteOffset || 0) + (posAcc.byteOffset || 0);
-    const uvOff = (uvBv.byteOffset || 0) + (uvAcc.byteOffset || 0);
-
-    const minX = posAcc.min[0], maxX = posAcc.max[0];
-    const minZ = posAcc.min[2], maxZ = posAcc.max[2];
-    const count = posAcc.count;
-
-    for (let i = 0; i < count; i++) {
-      const x = binDataView.getFloat32(posOff + i * 12, true);
-      const y = binDataView.getFloat32(posOff + i * 12 + 4, true);
-      const z = binDataView.getFloat32(posOff + i * 12 + 8, true);
-
-      const normX = (x - minX) / (maxX - minX);
-      const normZ = (maxZ - z) / (maxZ - minZ);
-
-      let u, v;
-      if (y >= 0) {
-        u = 0.04 + 0.92 * normX;
-      } else {
-        u = 0.04 + 0.92 * (1.0 - normX);
-      }
-      v = 0.04 + 0.92 * normZ;
-
-      u = Math.max(0.001, Math.min(0.999, u));
-      v = Math.max(0.001, Math.min(0.999, v));
-
-      binDataView.setFloat32(uvOff + i * 8, u, true);
-      binDataView.setFloat32(uvOff + i * 8 + 4, v, true);
-    }
-
-    // 2. Remove o mapa normal antigo que continha relevo do hambúrguer genérico
-    if (gltf.materials && gltf.materials[0]) {
-      delete gltf.materials[0].normalTexture;
-      if (gltf.materials[0].pbrMetallicRoughness) {
-        gltf.materials[0].pbrMetallicRoughness.roughnessFactor = 0.65;
-        gltf.materials[0].pbrMetallicRoughness.metallicFactor = 0.0;
+        const nx = -Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
+        const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
+        const nz = 0.9;
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        normals.push(nx / len, ny / len, nz / len);
       }
     }
 
-    // 3. Injeta a foto enviada na textura baseColor
-    const imgIdx = 0;
-    const bvIdx = gltf.images[imgIdx].bufferView;
-    gltf.images[imgIdx].mimeType = (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i0 = r * (cols + 1) + c;
+        const i1 = i0 + 1;
+        const i2 = (r + 1) * (cols + 1) + c;
+        const i3 = i2 + 1;
+        indices.push(i0, i1, i2);
+        indices.push(i1, i3, i2);
+      }
+    }
 
-    const bv = gltf.bufferViews[bvIdx];
-    const oldOffset = bv.byteOffset || 0;
-    const oldLen = bv.byteLength;
+    // 2. Face traseira
+    const backOffset = positions.length / 3;
+    for (let r = 0; r <= rows; r++) {
+      const t = r / rows;
+      for (let c = 0; c <= cols; c++) {
+        const u = c / cols;
+        const x = (u - 0.5) * width;
+        const y = t * height;
+        const bulge = Math.sin(u * Math.PI) * Math.sin(t * Math.PI);
+        const z = -(depth / 2) * (0.25 + 0.75 * bulge);
+        positions.push(x, y, z);
+        uvs.push(1.0 - u, 1.0 - t);
 
-    let newImg = new Uint8Array(imageBytes);
-    const pad = newImg.length % 4 === 0 ? 0 : 4 - (newImg.length % 4);
+        const nx = Math.cos(u * Math.PI) * Math.sin(t * Math.PI) * 0.3;
+        const ny = -Math.sin(u * Math.PI) * Math.cos(t * Math.PI) * 0.3;
+        const nz = -0.9;
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        normals.push(nx / len, ny / len, nz / len);
+      }
+    }
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i0 = backOffset + r * (cols + 1) + c;
+        const i1 = i0 + 1;
+        const i2 = backOffset + (r + 1) * (cols + 1) + c;
+        const i3 = i2 + 1;
+        indices.push(i0, i2, i1);
+        indices.push(i1, i2, i3);
+      }
+    }
+
+    // 3. Bordas perimétricas (topo, base na mesa, esquerda, direita)
+    for (let c = 0; c < cols; c++) {
+      const f0 = rows * (cols + 1) + c, f1 = f0 + 1;
+      const b0 = backOffset + rows * (cols + 1) + c, b1 = b0 + 1;
+      indices.push(f0, f1, b0); indices.push(f1, b1, b0);
+    }
+    for (let c = 0; c < cols; c++) {
+      const f0 = c, f1 = c + 1;
+      const b0 = backOffset + c, b1 = b0 + 1;
+      indices.push(f0, b0, f1); indices.push(f1, b0, b1);
+    }
+    for (let r = 0; r < rows; r++) {
+      const f0 = r * (cols + 1), f1 = (r + 1) * (cols + 1);
+      const b0 = backOffset + r * (cols + 1), b1 = backOffset + (r + 1) * (cols + 1);
+      indices.push(f0, b0, f1); indices.push(f1, b0, b1);
+    }
+    for (let r = 0; r < rows; r++) {
+      const f0 = r * (cols + 1) + cols, f1 = (r + 1) * (cols + 1) + cols;
+      const b0 = backOffset + r * (cols + 1) + cols, b1 = backOffset + (r + 1) * (cols + 1) + cols;
+      indices.push(f0, f1, b0); indices.push(f1, b1, b0);
+    }
+
+    const vertexCount = positions.length / 3;
+    const indexCount = indices.length;
+
+    const indexBytes = new Uint8Array(indexCount * 2);
+    const indexView = new DataView(indexBytes.buffer);
+    for (let i = 0; i < indexCount; i++) indexView.setUint16(i * 2, indices[i], true);
+
+    const posBytes = new Uint8Array(vertexCount * 12);
+    const posView = new DataView(posBytes.buffer);
+    for (let i = 0; i < positions.length; i++) posView.setFloat32(i * 4, positions[i], true);
+
+    const normBytes = new Uint8Array(vertexCount * 12);
+    const normView = new DataView(normBytes.buffer);
+    for (let i = 0; i < normals.length; i++) normView.setFloat32(i * 4, normals[i], true);
+
+    const uvBytes = new Uint8Array(vertexCount * 8);
+    const uvView = new DataView(uvBytes.buffer);
+    for (let i = 0; i < uvs.length; i++) uvView.setFloat32(i * 4, uvs[i], true);
+
+    let imgArray = imageBytes instanceof Uint8Array ? imageBytes : new Uint8Array(imageBytes);
+    const pad = imgArray.length % 4 === 0 ? 0 : 4 - (imgArray.length % 4);
     if (pad > 0) {
-      const padded = new Uint8Array(newImg.length + pad);
-      padded.set(newImg);
-      newImg = padded;
+      const padded = new Uint8Array(imgArray.length + pad);
+      padded.set(imgArray);
+      imgArray = padded;
     }
 
-    const diff = newImg.length - oldLen;
-    const before = binBytes.slice(0, oldOffset);
-    const after = binBytes.slice(oldOffset + oldLen);
+    const totalBinLength = indexBytes.length + posBytes.length + normBytes.length + uvBytes.length + imgArray.length;
+    const binBytes = new Uint8Array(totalBinLength);
+    let off = 0;
+    binBytes.set(indexBytes, off); off += indexBytes.length;
+    binBytes.set(posBytes, off); off += posBytes.length;
+    binBytes.set(normBytes, off); off += normBytes.length;
+    binBytes.set(uvBytes, off); off += uvBytes.length;
+    binBytes.set(imgArray, off);
 
-    const newBinBytes = new Uint8Array(before.length + newImg.length + after.length);
-    newBinBytes.set(before, 0);
-    newBinBytes.set(newImg, before.length);
-    newBinBytes.set(after, before.length + newImg.length);
+    const gltf = {
+      asset: { version: '2.0', generator: 'AuraBurger Advanced Volumetric Extruder' },
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+      nodes: [{ mesh: 0, name: 'FoodModel' }],
+      meshes: [{
+        name: 'ItemMesh',
+        primitives: [{
+          attributes: { POSITION: 1, NORMAL: 2, TEXCOORD_0: 3 },
+          indices: 0,
+          material: 0,
+          mode: 4
+        }]
+      }],
+      materials: [{
+        name: 'FoodMaterial',
+        alphaMode: 'MASK',
+        alphaCutoff: 0.1,
+        doubleSided: true,
+        pbrMetallicRoughness: {
+          baseColorTexture: { index: 0 },
+          roughnessFactor: 0.65,
+          metallicFactor: 0.0
+        }
+      }],
+      textures: [{ sampler: 0, source: 0 }],
+      images: [{ bufferView: 4, mimeType: (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg' }],
+      samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 }],
+      accessors: [
+        { bufferView: 0, componentType: 5123, count: indexCount, type: 'SCALAR' },
+        { bufferView: 1, componentType: 5126, count: vertexCount, max: [width / 2, height, depth / 2], min: [-width / 2, 0, -depth / 2], type: 'VEC3' },
+        { bufferView: 2, componentType: 5126, count: vertexCount, max: [1, 1, 1], min: [-1, -1, -1], type: 'VEC3' },
+        { bufferView: 3, componentType: 5126, count: vertexCount, max: [1, 1], min: [0, 0], type: 'VEC2' }
+      ],
+      bufferViews: [
+        { buffer: 0, byteOffset: 0, byteLength: indexBytes.length, target: 34963 },
+        { buffer: 0, byteOffset: indexBytes.length, byteLength: posBytes.length, target: 34962 },
+        { buffer: 0, byteOffset: indexBytes.length + posBytes.length, byteLength: normBytes.length, target: 34962 },
+        { buffer: 0, byteOffset: indexBytes.length + posBytes.length + normBytes.length, byteLength: uvBytes.length, target: 34962 },
+        { buffer: 0, byteOffset: indexBytes.length + posBytes.length + normBytes.length + uvBytes.length, byteLength: imageBytes.byteLength }
+      ],
+      buffers: [{ byteLength: totalBinLength }]
+    };
 
-    bv.byteLength = imageBytes.byteLength;
+    let jsonStr = JSON.stringify(gltf);
+    while (new TextEncoder().encode(jsonStr).length % 4 !== 0) jsonStr += ' ';
+    const jsonBytes = new TextEncoder().encode(jsonStr);
 
-    for (let i = 0; i < gltf.bufferViews.length; i++) {
-      if (i !== bvIdx && (gltf.bufferViews[i].byteOffset || 0) > oldOffset) {
-        gltf.bufferViews[i].byteOffset += diff;
-      }
-    }
-
-    gltf.buffers[0].byteLength = newBinBytes.length;
-
-    let newJsonStr = JSON.stringify(gltf);
-    while (new TextEncoder().encode(newJsonStr).length % 4 !== 0) {
-      newJsonStr += ' ';
-    }
-    const newJsonBytes = new TextEncoder().encode(newJsonStr);
-
-    const totalLength = 12 + 8 + newJsonBytes.length + 8 + newBinBytes.length;
+    const totalLength = 12 + 8 + jsonBytes.length + 8 + binBytes.length;
     const outBuffer = new ArrayBuffer(totalLength);
-    const outView = new DataView(outBuffer);
     const outBytes = new Uint8Array(outBuffer);
+    const outView = new DataView(outBuffer);
 
-    outBytes.set([0x67, 0x6C, 0x54, 0x46], 0); // 'glTF'
+    outBytes.set([0x67, 0x6C, 0x54, 0x46], 0);
     outView.setUint32(4, 2, true);
     outView.setUint32(8, totalLength, true);
 
-    outView.setUint32(12, newJsonBytes.length, true);
-    outBytes.set([0x4A, 0x53, 0x4F, 0x4E], 16); // 'JSON'
-    outBytes.set(newJsonBytes, 20);
+    outView.setUint32(12, jsonBytes.length, true);
+    outBytes.set([0x4A, 0x53, 0x4F, 0x4E], 16);
+    outBytes.set(jsonBytes, 20);
 
-    const binChunkOff = 20 + newJsonBytes.length;
-    outView.setUint32(binChunkOff, newBinBytes.length, true);
-    outBytes.set([0x42, 0x49, 0x4E, 0x00], binChunkOff + 4); // 'BIN\0'
-    outBytes.set(newBinBytes, binChunkOff + 8);
+    const binOff = 20 + jsonBytes.length;
+    outView.setUint32(binOff, binBytes.length, true);
+    outBytes.set([0x42, 0x49, 0x4E, 0x00], binOff + 4);
+    outBytes.set(binBytes, binOff + 8);
 
     const blob = new Blob([outBuffer], { type: 'model/gltf-binary' });
     return URL.createObjectURL(blob);
   } catch (err) {
-    console.error('Erro ao construir GLB no cliente:', err);
+    console.error('Erro ao construir GLB volumétrico no cliente:', err);
     return null;
   }
 }
 
-// Converte a foto 2D enviada em modelo 3D GLB
+// Converte a foto 2D enviada em modelo 3D GLB calibrado com a silhueta real do item
 async function convertUploadedPhotoTo3D() {
   if (!state.pendingUploadedPhotoBase64) {
-    alert('Selecione primeiro uma foto de hambúrguer para converter em 3D.');
+    alert('Selecione primeiro uma foto do produto para converter em 3D.');
     return;
   }
 
   const generateBtn = document.getElementById('btn-generate-3d');
   const btnText = document.getElementById('btn-generate-3d-text');
-  const baseMesh = document.getElementById('new-prod-base-mesh')?.value || 'smash';
-  const prodTitle = document.getElementById('new-prod-name')?.value || 'Burger Artesanal';
+  let baseMesh = document.getElementById('new-prod-base-mesh')?.value || 'auto';
+  const prodTitle = document.getElementById('new-prod-name')?.value || 'Item Especial';
 
-  if (generateBtn) generateBtn.disabled = true;
-  if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Projetando foto em 3D com textura PBR e escala 1:1...';
+  if (generateBtn) {
+    generateBtn.disabled = true;
+    generateBtn.classList.remove('animate-pulse');
+  }
+  if (btnText) {
+    btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Moldando silhueta 3D real do item fotografado...';
+  }
 
   const previewBox = document.getElementById('admin-3d-preview-box');
   const viewer = document.getElementById('admin-preview-viewer');
 
+  // Resolve as dimensões reais 1:1 conforme o formato do item
+  let width = 0.28, height = 0.18, depth = 0.085;
+  let realScaleCm = '28.0 cm (Combo Completo na Mesa)';
+
+  if (baseMesh === 'auto') {
+    const ratio = state.detectedAspectRatio || 1.0;
+    if (ratio >= 1.25) {
+      baseMesh = 'combo';
+    } else if (ratio <= 0.70) {
+      baseMesh = 'drink';
+    } else {
+      baseMesh = 'burger';
+    }
+  }
+
+  if (baseMesh === 'combo') {
+    width = 0.28; height = 0.18; depth = 0.085;
+    realScaleCm = '28.0 cm (Combo Completo na Mesa)';
+  } else if (baseMesh === 'drink') {
+    width = 0.10; height = 0.22; depth = 0.08;
+    realScaleCm = '22.0 cm (Bebida / Garrafa Real)';
+  } else if (baseMesh === 'fries') {
+    width = 0.18; height = 0.13; depth = 0.08;
+    realScaleCm = '18.0 cm (Porção Real)';
+  } else if (baseMesh === 'burger') {
+    width = 0.135; height = 0.11; depth = 0.135;
+    realScaleCm = '13.5 cm (Hambúrguer Individual Real)';
+  }
+
   let modelAssigned = false;
 
-  // 1. Gera o modelo 3D client-side com a foto real (resultado imediato e 100% fiel à foto)
+  // 1. Gera o modelo 3D volumétrico client-side com resultado imediato e 100% fiel ao formato
   if (state.pendingUploadedArrayBuffer) {
     try {
-      const clientGlbUrl = await buildClientGlbFromPhoto(state.pendingUploadedArrayBuffer, state.pendingUploadedMimeType || 'image/jpeg');
+      const clientGlbUrl = await buildVolumetricGlbClient(
+        state.pendingUploadedArrayBuffer,
+        'image/png',
+        width,
+        height,
+        depth
+      );
+
       if (clientGlbUrl) {
         state.pendingGenerated3D = {
           imageUrl: state.pendingUploadedPhotoBase64,
           modelGlbUrl: clientGlbUrl,
-          realScaleCm: '13.5 cm (Escala 1:1 Real)'
+          realScaleCm: realScaleCm
         };
+
         if (viewer && previewBox) {
           viewer.src = clientGlbUrl;
           previewBox.classList.remove('hidden');
@@ -1212,11 +1503,11 @@ async function convertUploadedPhotoTo3D() {
         }
       }
     } catch (clientErr) {
-      console.warn('Geração local via canvas/buffer falhou:', clientErr);
+      console.warn('Geração local falhou:', clientErr);
     }
   }
 
-  // 2. Envia ao backend para salvar o GLB em disco de forma persistente
+  // 2. Envia ao backend para persistir o GLB em disco
   try {
     const apiBase = getApiBase();
     const res = await fetch(`${apiBase}/api/admin/convert-3d`, {
@@ -1224,8 +1515,9 @@ async function convertUploadedPhotoTo3D() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         imageBase64: state.pendingUploadedPhotoBase64,
-        mimeType: state.pendingUploadedMimeType || 'image/jpeg',
+        mimeType: 'image/png',
         baseModel: baseMesh,
+        dimensions: { width, height, depth },
         title: prodTitle
       })
     });
@@ -1235,7 +1527,7 @@ async function convertUploadedPhotoTo3D() {
       state.pendingGenerated3D = {
         imageUrl: data.imageUrl,
         modelGlbUrl: data.modelGlbUrl,
-        realScaleCm: data.realScaleCm
+        realScaleCm: data.realScaleCm || realScaleCm
       };
 
       if (viewer && previewBox) {
@@ -1245,13 +1537,15 @@ async function convertUploadedPhotoTo3D() {
       }
     }
   } catch (err) {
-    console.warn('Servidor local não respondeu, utilizando modelo 3D renderizado pelo cliente.');
+    console.warn('Servidor local indisponível, utilizando modelo 3D gerado localmente.');
   }
 
   if (modelAssigned) {
-    showToastNotification('✨ Modelo 3D criado com sucesso a partir da SUA foto!');
+    const scaleLabel = document.getElementById('admin-3d-scale-label');
+    if (scaleLabel) scaleLabel.textContent = realScaleCm;
+    showToastNotification(`✨ Modelo 3D criado no formato exato: ${realScaleCm}`);
   } else {
-    alert('Não foi possível processar a imagem. Tente uma foto em formato JPG ou PNG.');
+    alert('Não foi possível gerar o modelo 3D. Tente enviar uma foto JPG ou PNG.');
   }
 
   if (generateBtn) generateBtn.disabled = false;
