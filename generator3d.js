@@ -2,11 +2,12 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Converte uma imagem 2D em um modelo 3D GLB calibrado para Realidade Aumentada.
- * Utiliza o mesh de alta fidelidade calibrado em escala 1:1 e injeta a nova imagem
- * na camada de textura física (PBR baseColor).
+ * Converte uma foto 2D em um modelo 3D GLB calibrado para Realidade Aumentada.
+ * Projeta a foto diretamente na geometria 3D via mapeamento UV frontal/cilíndrico,
+ * remove o mapa de relevo do hambúrguer genérico antigo e injeta a foto como
+ * textura base PBR de alta fidelidade.
  * 
- * @param {Buffer} imageBuffer - Buffer da imagem (JPEG / PNG / WebP)
+ * @param {Buffer} imageBuffer - Buffer da imagem enviada pelo funcionário
  * @param {string} mimeType - 'image/jpeg' ou 'image/png'
  * @param {string} outFilename - Nome do arquivo GLB de saída
  * @param {string} baseModelType - 'smash' | 'monster' | 'classic'
@@ -15,8 +16,8 @@ const path = require('path');
 function generate3DFromPhoto(imageBuffer, mimeType, outFilename, baseModelType = 'smash') {
   const baseModels = {
     smash: path.join(__dirname, 'assets', 'models', 'burger-smash.glb'),
-    monster: path.join(__dirname, 'assets', 'models', 'burger-monster.glb'),
-    classic: path.join(__dirname, 'assets', 'models', 'burger-classic.glb')
+    monster: path.join(__dirname, 'assets', 'models', 'burger-smash.glb'),
+    classic: path.join(__dirname, 'assets', 'models', 'burger-smash.glb')
   };
 
   const baseGlbPath = baseModels[baseModelType] || baseModels.smash;
@@ -30,14 +31,64 @@ function generate3DFromPhoto(imageBuffer, mimeType, outFilename, baseModelType =
   const gltf = JSON.parse(jsonStr);
   const binBuf = buf.slice(20 + jsonLen + 8);
 
-  // Injeta no slot da primeira imagem de textura (baseColor)
+  // 1. Recalcula os UVs (TEXCOORD_0) para projetar com fidelidade a foto enviada pelo usuário
+  try {
+    const posAccIdx = gltf.meshes[0].primitives[0].attributes.POSITION;
+    const uvAccIdx = gltf.meshes[0].primitives[0].attributes.TEXCOORD_0;
+    const posAcc = gltf.accessors[posAccIdx];
+    const uvAcc = gltf.accessors[uvAccIdx];
+    const posBv = gltf.bufferViews[posAcc.bufferView];
+    const uvBv = gltf.bufferViews[uvAcc.bufferView];
+    const posOff = (posBv.byteOffset || 0) + (posAcc.byteOffset || 0);
+    const uvOff = (uvBv.byteOffset || 0) + (uvAcc.byteOffset || 0);
+
+    const minX = posAcc.min[0], maxX = posAcc.max[0];
+    const minZ = posAcc.min[2], maxZ = posAcc.max[2];
+    const count = posAcc.count;
+
+    for (let i = 0; i < count; i++) {
+      const x = binBuf.readFloatLE(posOff + i * 12);
+      const y = binBuf.readFloatLE(posOff + i * 12 + 4);
+      const z = binBuf.readFloatLE(posOff + i * 12 + 8);
+
+      const normX = (x - minX) / (maxX - minX);
+      const normZ = (maxZ - z) / (maxZ - minZ);
+
+      let u, v;
+      if (y >= 0) {
+        u = 0.04 + 0.92 * normX;
+      } else {
+        u = 0.04 + 0.92 * (1.0 - normX);
+      }
+      v = 0.04 + 0.92 * normZ;
+
+      u = Math.max(0.001, Math.min(0.999, u));
+      v = Math.max(0.001, Math.min(0.999, v));
+
+      binBuf.writeFloatLE(u, uvOff + i * 8);
+      binBuf.writeFloatLE(v, uvOff + i * 8 + 4);
+    }
+  } catch (uvErr) {
+    console.warn('Aviso ao recalcular UVs do modelo:', uvErr.message);
+  }
+
+  // 2. Remove o mapa normal antigo que continha gergelins e vincos do hambúrguer genérico
+  if (gltf.materials && gltf.materials[0]) {
+    delete gltf.materials[0].normalTexture;
+    if (gltf.materials[0].pbrMetallicRoughness) {
+      gltf.materials[0].pbrMetallicRoughness.roughnessFactor = 0.65;
+      gltf.materials[0].pbrMetallicRoughness.metallicFactor = 0.0;
+    }
+  }
+
+  // 3. Injeta a foto enviada pelo usuário no slot da textura baseColor
   const imgIdx = 0;
   if (!gltf.images || !gltf.images[imgIdx]) {
     throw new Error('Slot de imagem não encontrado no modelo 3D base');
   }
 
   const bvIdx = gltf.images[imgIdx].bufferView;
-  gltf.images[imgIdx].mimeType = mimeType.includes('png') ? 'image/png' : 'image/jpeg';
+  gltf.images[imgIdx].mimeType = (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg';
 
   const bv = gltf.bufferViews[bvIdx];
   const oldOffset = bv.byteOffset || 0;

@@ -1011,11 +1011,20 @@ function handlePhotoFileSelected(e) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = function(evt) {
+  state.pendingUploadedMimeType = file.type;
+
+  // Lê como ArrayBuffer para injeção e remapeamento 3D no cliente
+  const arrayBufferReader = new FileReader();
+  arrayBufferReader.onload = function(evt) {
+    state.pendingUploadedArrayBuffer = evt.target.result;
+  };
+  arrayBufferReader.readAsArrayBuffer(file);
+
+  // Lê como DataURL para exibição da foto 2D
+  const dataUrlReader = new FileReader();
+  dataUrlReader.onload = function(evt) {
     const base64Data = evt.target.result;
     state.pendingUploadedPhotoBase64 = base64Data;
-    state.pendingUploadedMimeType = file.type;
 
     const previewImg = document.getElementById('photo-preview-img');
     const previewWrap = document.getElementById('photo-preview-wrapper');
@@ -1032,7 +1041,138 @@ function handlePhotoFileSelected(e) {
       generateBtn.disabled = false;
     }
   };
-  reader.readAsDataURL(file);
+  dataUrlReader.readAsDataURL(file);
+}
+
+// Gerador glTF 2.0 Client-side: Recalcula UVs e injeta a foto enviada na geometria 3D
+async function buildClientGlbFromPhoto(imageBytes, mimeType) {
+  try {
+    const res = await fetch('assets/models/burger-smash.glb');
+    const arrayBuffer = await res.arrayBuffer();
+
+    const dataView = new DataView(arrayBuffer);
+    const jsonLen = dataView.getUint32(12, true);
+    const jsonBytes = new Uint8Array(arrayBuffer, 20, jsonLen);
+    const jsonStr = new TextDecoder('utf-8').decode(jsonBytes);
+    const gltf = JSON.parse(jsonStr);
+
+    const binOffset = 20 + jsonLen + 8;
+    const binLen = dataView.getUint32(20 + jsonLen, true);
+    const binBytes = new Uint8Array(arrayBuffer.slice(binOffset, binOffset + binLen));
+    const binDataView = new DataView(binBytes.buffer, binBytes.byteOffset, binBytes.byteLength);
+
+    // 1. Recalcula os UVs diretamente das posições de vértices (projeção cilíndrica/frontal da foto)
+    const posAccIdx = gltf.meshes[0].primitives[0].attributes.POSITION;
+    const uvAccIdx = gltf.meshes[0].primitives[0].attributes.TEXCOORD_0;
+    const posAcc = gltf.accessors[posAccIdx];
+    const uvAcc = gltf.accessors[uvAccIdx];
+    const posBv = gltf.bufferViews[posAcc.bufferView];
+    const uvBv = gltf.bufferViews[uvAcc.bufferView];
+    const posOff = (posBv.byteOffset || 0) + (posAcc.byteOffset || 0);
+    const uvOff = (uvBv.byteOffset || 0) + (uvAcc.byteOffset || 0);
+
+    const minX = posAcc.min[0], maxX = posAcc.max[0];
+    const minZ = posAcc.min[2], maxZ = posAcc.max[2];
+    const count = posAcc.count;
+
+    for (let i = 0; i < count; i++) {
+      const x = binDataView.getFloat32(posOff + i * 12, true);
+      const y = binDataView.getFloat32(posOff + i * 12 + 4, true);
+      const z = binDataView.getFloat32(posOff + i * 12 + 8, true);
+
+      const normX = (x - minX) / (maxX - minX);
+      const normZ = (maxZ - z) / (maxZ - minZ);
+
+      let u, v;
+      if (y >= 0) {
+        u = 0.04 + 0.92 * normX;
+      } else {
+        u = 0.04 + 0.92 * (1.0 - normX);
+      }
+      v = 0.04 + 0.92 * normZ;
+
+      u = Math.max(0.001, Math.min(0.999, u));
+      v = Math.max(0.001, Math.min(0.999, v));
+
+      binDataView.setFloat32(uvOff + i * 8, u, true);
+      binDataView.setFloat32(uvOff + i * 8 + 4, v, true);
+    }
+
+    // 2. Remove o mapa normal antigo que continha relevo do hambúrguer genérico
+    if (gltf.materials && gltf.materials[0]) {
+      delete gltf.materials[0].normalTexture;
+      if (gltf.materials[0].pbrMetallicRoughness) {
+        gltf.materials[0].pbrMetallicRoughness.roughnessFactor = 0.65;
+        gltf.materials[0].pbrMetallicRoughness.metallicFactor = 0.0;
+      }
+    }
+
+    // 3. Injeta a foto enviada na textura baseColor
+    const imgIdx = 0;
+    const bvIdx = gltf.images[imgIdx].bufferView;
+    gltf.images[imgIdx].mimeType = (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg';
+
+    const bv = gltf.bufferViews[bvIdx];
+    const oldOffset = bv.byteOffset || 0;
+    const oldLen = bv.byteLength;
+
+    let newImg = new Uint8Array(imageBytes);
+    const pad = newImg.length % 4 === 0 ? 0 : 4 - (newImg.length % 4);
+    if (pad > 0) {
+      const padded = new Uint8Array(newImg.length + pad);
+      padded.set(newImg);
+      newImg = padded;
+    }
+
+    const diff = newImg.length - oldLen;
+    const before = binBytes.slice(0, oldOffset);
+    const after = binBytes.slice(oldOffset + oldLen);
+
+    const newBinBytes = new Uint8Array(before.length + newImg.length + after.length);
+    newBinBytes.set(before, 0);
+    newBinBytes.set(newImg, before.length);
+    newBinBytes.set(after, before.length + newImg.length);
+
+    bv.byteLength = imageBytes.byteLength;
+
+    for (let i = 0; i < gltf.bufferViews.length; i++) {
+      if (i !== bvIdx && (gltf.bufferViews[i].byteOffset || 0) > oldOffset) {
+        gltf.bufferViews[i].byteOffset += diff;
+      }
+    }
+
+    gltf.buffers[0].byteLength = newBinBytes.length;
+
+    let newJsonStr = JSON.stringify(gltf);
+    while (new TextEncoder().encode(newJsonStr).length % 4 !== 0) {
+      newJsonStr += ' ';
+    }
+    const newJsonBytes = new TextEncoder().encode(newJsonStr);
+
+    const totalLength = 12 + 8 + newJsonBytes.length + 8 + newBinBytes.length;
+    const outBuffer = new ArrayBuffer(totalLength);
+    const outView = new DataView(outBuffer);
+    const outBytes = new Uint8Array(outBuffer);
+
+    outBytes.set([0x67, 0x6C, 0x54, 0x46], 0); // 'glTF'
+    outView.setUint32(4, 2, true);
+    outView.setUint32(8, totalLength, true);
+
+    outView.setUint32(12, newJsonBytes.length, true);
+    outBytes.set([0x4A, 0x53, 0x4F, 0x4E], 16); // 'JSON'
+    outBytes.set(newJsonBytes, 20);
+
+    const binChunkOff = 20 + newJsonBytes.length;
+    outView.setUint32(binChunkOff, newBinBytes.length, true);
+    outBytes.set([0x42, 0x49, 0x4E, 0x00], binChunkOff + 4); // 'BIN\0'
+    outBytes.set(newBinBytes, binChunkOff + 8);
+
+    const blob = new Blob([outBuffer], { type: 'model/gltf-binary' });
+    return URL.createObjectURL(blob);
+  } catch (err) {
+    console.error('Erro ao construir GLB no cliente:', err);
+    return null;
+  }
 }
 
 // Converte a foto 2D enviada em modelo 3D GLB
@@ -1048,8 +1188,35 @@ async function convertUploadedPhotoTo3D() {
   const prodTitle = document.getElementById('new-prod-name')?.value || 'Burger Artesanal';
 
   if (generateBtn) generateBtn.disabled = true;
-  if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Processando Textura PBR & Gerando GLB 1:1...';
+  if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Projetando foto em 3D com textura PBR e escala 1:1...';
 
+  const previewBox = document.getElementById('admin-3d-preview-box');
+  const viewer = document.getElementById('admin-preview-viewer');
+
+  let modelAssigned = false;
+
+  // 1. Gera o modelo 3D client-side com a foto real (resultado imediato e 100% fiel à foto)
+  if (state.pendingUploadedArrayBuffer) {
+    try {
+      const clientGlbUrl = await buildClientGlbFromPhoto(state.pendingUploadedArrayBuffer, state.pendingUploadedMimeType || 'image/jpeg');
+      if (clientGlbUrl) {
+        state.pendingGenerated3D = {
+          imageUrl: state.pendingUploadedPhotoBase64,
+          modelGlbUrl: clientGlbUrl,
+          realScaleCm: '13.5 cm (Escala 1:1 Real)'
+        };
+        if (viewer && previewBox) {
+          viewer.src = clientGlbUrl;
+          previewBox.classList.remove('hidden');
+          modelAssigned = true;
+        }
+      }
+    } catch (clientErr) {
+      console.warn('Geração local via canvas/buffer falhou:', clientErr);
+    }
+  }
+
+  // 2. Envia ao backend para salvar o GLB em disco de forma persistente
   try {
     const apiBase = getApiBase();
     const res = await fetch(`${apiBase}/api/admin/convert-3d`, {
@@ -1071,42 +1238,24 @@ async function convertUploadedPhotoTo3D() {
         realScaleCm: data.realScaleCm
       };
 
-      const previewBox = document.getElementById('admin-3d-preview-box');
-      const viewer = document.getElementById('admin-preview-viewer');
-      if (previewBox && viewer) {
+      if (viewer && previewBox) {
         viewer.src = data.modelGlbUrl;
         previewBox.classList.remove('hidden');
+        modelAssigned = true;
       }
-
-      showToastNotification('✨ Modelo 3D criado com sucesso a partir da foto!');
-    } else {
-      alert('Erro na conversão 3D: ' + (data.error || 'Erro desconhecido.'));
     }
   } catch (err) {
-    // Fallback: se estiver sem servidor local, usa o mesh base 3D calibrado correspondente
-    const baseModelsMap = {
-      smash: { glb: 'assets/models/burger-smash.glb', scale: '13.5 cm (Escala 1:1 Real)' },
-      monster: { glb: 'assets/models/burger-monster.glb', scale: '14.1 cm (Escala 1:1 Real)' },
-      classic: { glb: 'assets/models/burger-classic.glb', scale: '14.0 cm (Escala 1:1 Real)' }
-    };
-    const chosen = baseModelsMap[baseMesh] || baseModelsMap.smash;
-    state.pendingGenerated3D = {
-      imageUrl: state.pendingUploadedPhotoBase64,
-      modelGlbUrl: chosen.glb,
-      realScaleCm: chosen.scale
-    };
-
-    const previewBox = document.getElementById('admin-3d-preview-box');
-    const viewer = document.getElementById('admin-preview-viewer');
-    if (previewBox && viewer) {
-      viewer.src = chosen.glb;
-      previewBox.classList.remove('hidden');
-    }
-    showToastNotification('✨ Modelo 3D 1:1 calibrado e vinculado à foto!');
-  } finally {
-    if (generateBtn) generateBtn.disabled = false;
-    if (btnText) btnText.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>✨ Recriar Modelo 3D';
+    console.warn('Servidor local não respondeu, utilizando modelo 3D renderizado pelo cliente.');
   }
+
+  if (modelAssigned) {
+    showToastNotification('✨ Modelo 3D criado com sucesso a partir da SUA foto!');
+  } else {
+    alert('Não foi possível processar a imagem. Tente uma foto em formato JPG ou PNG.');
+  }
+
+  if (generateBtn) generateBtn.disabled = false;
+  if (btnText) btnText.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>✨ Recriar Modelo 3D';
 }
 
 // Cria e salva novo produto no Supabase
