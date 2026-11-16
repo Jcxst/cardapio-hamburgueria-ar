@@ -506,7 +506,7 @@
   <!-- ==========================================================================
        MODAL 4: AUTENTICAÇÃO DO FUNCIONÁRIO (teste3d / 123teste)
        ========================================================================== -->
-  <div id="admin-auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl hidden" role="dialog" aria-modal="true">
+  <div id="admin-auth-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl hidden" onclick="if(event.target === this) closeAdminAuth()" role="dialog" aria-modal="true">
     <div class="modal-scale relative w-full max-w-md bg-[#12141c] rounded-3xl p-6 sm:p-8 border border-white/15 text-center shadow-2xl">
       
       <button 
@@ -583,7 +583,7 @@
   <!-- ==========================================================================
        MODAL 5: DASHBOARD DO FUNCIONÁRIO (CRUD SUPABASE + CONVERSOR FOTO 3D)
        ========================================================================== -->
-  <div id="admin-dashboard-modal" class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/95 backdrop-blur-2xl hidden" role="dialog" aria-modal="true">
+  <div id="admin-dashboard-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/95 backdrop-blur-2xl hidden" onclick="if(event.target === this) closeAdminDashboard()" role="dialog" aria-modal="true">
     <div class="modal-scale relative w-full h-[95vh] max-w-5xl bg-[#0f1118] rounded-3xl border border-white/15 shadow-2xl flex flex-col overflow-hidden">
       
       <!-- Dashboard Header -->

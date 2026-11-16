@@ -686,17 +686,27 @@ function openAdminAuth() {
   const modal = document.getElementById('admin-auth-modal');
   if (modal) {
     modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    setTimeout(() => {
+      modal.classList.add('modal-active');
+    }, 10);
     const err = document.getElementById('admin-auth-error');
     if (err) err.classList.add('hidden');
     setTimeout(() => {
       document.getElementById('admin-username')?.focus();
-    }, 100);
+    }, 150);
   }
 }
 
 function closeAdminAuth() {
   const modal = document.getElementById('admin-auth-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.remove('modal-active');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }, 250);
+  }
 }
 
 async function handleAdminLogin(e) {
@@ -710,7 +720,7 @@ async function handleAdminLogin(e) {
   if (errBox) errBox.classList.add('hidden');
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Verificando...</span>';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span>Verificando...</span>';
   }
 
   try {
@@ -725,7 +735,9 @@ async function handleAdminLogin(e) {
       sessionStorage.setItem('aura_admin_token', data.token);
       closeAdminAuth();
       showToastNotification('Bem-vindo ao Painel, ' + username + '!');
-      openAdminDashboard();
+      setTimeout(() => {
+        openAdminDashboard();
+      }, 200);
     } else {
       if (errBox && errMsg) {
         errMsg.textContent = data.error || 'Credenciais inválidas. Use teste3d / 123teste.';
@@ -740,7 +752,7 @@ async function handleAdminLogin(e) {
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i><span>Entrar no Dashboard</span>';
+      submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-1.5"></i><span>Entrar no Dashboard</span>';
     }
   }
 }
@@ -749,6 +761,10 @@ function openAdminDashboard() {
   const modal = document.getElementById('admin-dashboard-modal');
   if (modal) {
     modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    setTimeout(() => {
+      modal.classList.add('modal-active');
+    }, 10);
     switchAdminTab('products');
     renderAdminProducts();
     loadAdminOrders();
@@ -757,7 +773,13 @@ function openAdminDashboard() {
 
 function closeAdminDashboard() {
   const modal = document.getElementById('admin-dashboard-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.remove('modal-active');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }, 250);
+  }
 }
 
 function adminLogout() {
