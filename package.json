@@ -1,0 +1,18 @@
+{
+  "name": "cardapio-hamburgueria-ar",
+  "version": "1.0.0",
+  "description": "Cardápio Digital de Hamburgueria com Realidade Aumentada (Model Viewer & WebXR)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "augmented-reality",
+    "model-viewer",
+    "webxr",
+    "burger-menu",
+    "cardapio-digital"
+  ],
+  "author": "Aura Burger Lab",
+  "license": "MIT"
+}

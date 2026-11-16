@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AURA BURGER • Cardápio Digital 3D & Realidade Aumentada</title>
+  
+  <!-- SEO & Social Meta -->
+  <meta name="description" content="Experimente o futuro da gastronomia. Projete nossos hambúrgueres artesanais em escala real (1:1) diretamente sobre a sua mesa com Realidade Aumentada antes de pedir." />
+  <meta name="theme-color" content="#0a0b10" />
+
+  <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            aura: {
+              gold: '#f59e0b',
+              orange: '#ff6b00',
+              red: '#dc2626',
+              dark: '#0a0b10',
+              surface: '#12141c',
+              border: 'rgba(255, 255, 255, 0.08)'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['"Outfit"', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google <model-viewer> Web Component (Modern WebXR + Scene Viewer + Quick Look) -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+
+  <!-- QRCode.js CDN for Desktop to Phone Pairing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body class="bg-[#0a0b10] text-slate-100 min-h-screen selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- Ambient Luxury Glow Background -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[450px] bg-gradient-to-b from-amber-600/15 via-orange-600/5 to-transparent blur-3xl rounded-full"></div>
+    <div class="absolute top-[40%] -left-40 w-[500px] h-[500px] bg-orange-600/10 blur-[140px] rounded-full"></div>
+    <div class="absolute top-[70%] -right-40 w-[500px] h-[500px] bg-amber-500/10 blur-[140px] rounded-full"></div>
+  </div>
+
+  <!-- Main App Container -->
+  <div class="relative z-10 flex flex-col min-h-screen">
+
+    <!-- Top Sticky Header -->
+    <header class="sticky top-0 z-40 glass-nav border-b border-white/10 px-4 lg:px-8 py-3.5 transition-all">
+      <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+        
+        <!-- Brand Logo -->
+        <a href="#" class="flex items-center gap-3 group">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 p-[2px] shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
+            <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+              <i class="fa-solid fa-burger text-amber-400 text-lg"></i>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-display font-black text-xl tracking-tight text-white">AURA<span class="text-amber-500">.</span>BURGER</span>
+              <span class="hidden sm:inline-flex px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                3D & AR Craft
+              </span>
+            </div>
+            <div class="text-[11px] text-slate-400 flex items-center gap-1.5 font-medium">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Aberto Agora • Entrega em 25-35 min</span>
+            </div>
+          </div>
+        </a>
+
+        <!-- Header Actions -->
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <!-- Mobile QR Pairing Button (Visible on medium+ screens) -->
+          <button 
+            onclick="openQrModal()"
+            class="hidden md:inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+            title="Escanear com o celular para ver na mesa"
+          >
+            <i class="fa-solid fa-qrcode text-amber-400"></i>
+            <span>Abrir no Celular</span>
+          </button>
+
+          <!-- Shopping Cart Trigger Button -->
+          <button 
+            onclick="openCart()"
+            class="relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all"
+            aria-label="Abrir Sacola de Pedidos"
+          >
+            <i class="fa-solid fa-bag-shopping text-base"></i>
+            <span class="hidden sm:inline">Sacola</span>
+            <!-- Badge Count -->
+            <span class="cart-count-badge hidden absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-[11px] font-black items-center justify-center text-white border-2 border-slate-950 shadow-md">
+              0
+            </span>
+          </button>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- Hero Section (Scrollytelling & Sensory Pitch) -->
+    <section class="relative pt-10 pb-8 px-4 lg:px-8 max-w-7xl mx-auto w-full">
+      <div class="text-center max-w-3xl mx-auto mb-10">
+        
+        <!-- Live AR Tag -->
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/10 via-orange-500/15 to-red-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider mb-5 shimmer-badge">
+          <i class="fa-solid fa-cube text-sm animate-spin" style="animation-duration: 8s;"></i>
+          <span>Tecnologia WebXR • Escala Real 1:1 na Mesa</span>
+        </div>
+
+        <h1 class="font-display font-black text-3xl sm:text-5xl lg:text-6xl text-white tracking-tight leading-[1.1] mb-5">
+          Veja seu burger na mesa <br class="hidden sm:inline" />
+          <span class="text-gradient-gold">antes mesmo de pedir.</span>
+        </h1>
+
+        <p class="text-slate-300 text-base sm:text-lg leading-relaxed font-normal mb-8">
+          Chega de surpresas com fotos falsas ou tamanhos irreais. Nosso cardápio digital projeta cada hambúrguer em <strong>Realidade Aumentada</strong> com dimensões exatas na sua mesa pelo navegador do celular.
+        </p>
+
+        <!-- Metrics & Trust Bar -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4 px-6 rounded-2xl glass-panel border border-white/10 shadow-2xl">
+          <div class="text-center py-2">
+            <div class="text-2xl sm:text-3xl font-display font-black text-amber-400">1:1</div>
+            <div class="text-xs text-slate-400 font-semibold mt-0.5">Escala Real Exata</div>
+          </div>
+          <div class="text-center py-2 border-l border-white/10">
+            <div class="text-2xl sm:text-3xl font-display font-black text-white">100%</div>
+            <div class="text-xs text-slate-400 font-semibold mt-0.5">Angus Fresco</div>
+          </div>
+          <div class="text-center py-2 border-l sm:border-l border-white/10">
+            <div class="text-2xl sm:text-3xl font-display font-black text-amber-400">4.9 ★</div>
+            <div class="text-xs text-slate-400 font-semibold mt-0.5">+2.400 Avaliações</div>
+          </div>
+          <div class="text-center py-2 border-l border-white/10">
+            <div class="text-2xl sm:text-3xl font-display font-black text-white">25m</div>
+            <div class="text-xs text-slate-400 font-semibold mt-0.5">Preparo Médio</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick 3-Step AR How It Works Strip -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 max-w-5xl mx-auto">
+        <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-start gap-3.5">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm shrink-0">1</div>
+          <div>
+            <h4 class="text-sm font-bold text-white mb-0.5">Escolha no Cardápio</h4>
+            <p class="text-xs text-slate-400">Navegue pelas nossas opções artesanais de smash e blends nobres.</p>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-start gap-3.5">
+          <div class="w-8 h-8 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-sm shrink-0">2</div>
+          <div>
+            <h4 class="text-sm font-bold text-white mb-0.5">Clique em "Ver em RA 3D"</h4>
+            <p class="text-xs text-slate-400">Gire em 360°, inspecione as camadas e ative a câmera do celular.</p>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-start gap-3.5">
+          <div class="w-8 h-8 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-sm shrink-0">3</div>
+          <div>
+            <h4 class="text-sm font-bold text-white mb-0.5">Projete na sua Mesa</h4>
+            <p class="text-xs text-slate-400">Aponte para uma superfície plana e veja o burger em tamanho real!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search & Category Filters -->
+      <div class="sticky top-[69px] z-30 py-3 bg-[#0a0b10]/95 backdrop-blur-xl border-y border-white/5 -mx-4 px-4 lg:-mx-8 lg:px-8 mb-8">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+          
+          <!-- Category Tabs -->
+          <div id="category-tabs" class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+            <button data-category="todos" class="px-4 py-2 rounded-xl text-xs font-bold shrink-0 bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 transition-all">
+              🔥 Todos os Itens
+            </button>
+            <button data-category="artesanais" class="px-4 py-2 rounded-xl text-xs font-bold shrink-0 bg-white/5 text-slate-300 hover:bg-white/10 transition-all">
+              🍔 Burgers Artesanais
+            </button>
+            <button data-category="smash" class="px-4 py-2 rounded-xl text-xs font-bold shrink-0 bg-white/5 text-slate-300 hover:bg-white/10 transition-all">
+              🥓 Smash Burgers
+            </button>
+            <button data-category="especiais" class="px-4 py-2 rounded-xl text-xs font-bold shrink-0 bg-white/5 text-slate-300 hover:bg-white/10 transition-all">
+              🍗 Especiais do Chef
+            </button>
+            <button data-category="acompanhamentos" class="px-4 py-2 rounded-xl text-xs font-bold shrink-0 bg-white/5 text-slate-300 hover:bg-white/10 transition-all">
+              🍟 Acompanhamentos
+            </button>
+            <button data-category="sobremesas" class="px-4 py-2 rounded-xl text-xs font-bold shrink-0 bg-white/5 text-slate-300 hover:bg-white/10 transition-all">
+              🍦 Shakes & Doces
+            </button>
+          </div>
+
+          <!-- Search Input -->
+          <div class="relative w-full md:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+            <input 
+              type="text" 
+              id="search-input" 
+              placeholder="Buscar burger, ingrediente..." 
+              class="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition-colors"
+            />
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Product Catalog Grid -->
+      <div id="product-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+    </section>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-white/10 bg-[#07080c] py-12 px-4 lg:px-8 text-center text-slate-400 text-xs">
+      <div class="max-w-5xl mx-auto flex flex-col items-center gap-6">
+        
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-burger text-amber-500 text-xl"></i>
+          <span class="font-display font-black text-lg text-white">AURA BURGER • CRAFT LAB</span>
+        </div>
+
+        <p class="max-w-md text-slate-400 text-xs leading-relaxed">
+          Pioneiros em experiência gastronômica imersiva. Cada hambúrguer é moldado com blend de carnes frescas e projetado digitalmente em escala real com tecnologia Google Model Viewer e WebXR.
+        </p>
+
+        <div class="flex flex-wrap justify-center gap-6 text-slate-300 font-medium">
+          <span>📍 Rua dos Pinheiros, 840 - São Paulo, SP</span>
+          <span>📞 (11) 99999-9999</span>
+          <span>⏰ Ter a Dom: 18h às 23h45</span>
+        </div>
+
+        <div class="pt-6 border-t border-white/5 w-full flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
+          <span>© 2026 Aura Burger Lab. Todos os direitos reservados.</span>
+          <div class="flex items-center gap-3">
+            <span class="inline-flex items-center gap-1.5"><i class="fa-brands fa-google text-amber-500"></i> Model-Viewer 3.5</span>
+            <span>•</span>
+            <span class="inline-flex items-center gap-1.5"><i class="fa-solid fa-vr-cardboard text-orange-500"></i> WebXR & ARCore</span>
+          </div>
+        </div>
+
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 1: REALIDADE AUMENTADA & 3D INTERATIVO (GOOGLE MODEL-VIEWER)
+       ========================================================================== -->
+  <div id="ar-modal" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/90 backdrop-blur-2xl hidden" role="dialog" aria-modal="true">
+    
+    <div class="modal-scale relative w-full h-full sm:h-[92vh] max-w-5xl bg-[#0e1017] sm:rounded-3xl border border-white/15 shadow-2xl flex flex-col lg:flex-row overflow-hidden">
+      
+      <!-- Top Close Button for Mobile -->
+      <button 
+        onclick="closeArModal()"
+        class="absolute top-4 right-4 z-30 w-10 h-10 rounded-full bg-slate-950/80 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+        aria-label="Fechar Visualizador"
+      >
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <!-- LEFT SIDE: 3D / AR Interactive Viewport Area -->
+      <div class="relative w-full lg:w-[60%] h-[48vh] lg:h-full bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col justify-between overflow-hidden">
+        
+        <!-- Live Camera Feed (used for Laptop/Desktop AR Simulator fallback) -->
+        <video id="ar-camera-feed" class="hidden" autoplay playsinline muted></video>
+
+        <!-- Camera Reticle / Target Overlay -->
+        <div id="ar-camera-overlay" class="hidden absolute inset-0 pointer-events-none z-10 flex flex-col items-center justify-center">
+          <div class="w-64 h-64 border-2 border-dashed border-amber-400/60 rounded-full animate-pulse flex items-center justify-center">
+            <div class="w-4 h-4 bg-amber-400 rounded-full shadow-lg shadow-amber-400"></div>
+          </div>
+          <span class="mt-4 px-3 py-1 rounded-full bg-black/75 backdrop-blur-md text-amber-300 text-xs font-bold border border-amber-400/30">
+            Posicione o hambúrguer sobre a superfície
+          </span>
+        </div>
+
+        <!-- Top Viewport Control Chips -->
+        <div class="relative z-20 p-4 flex items-center justify-between gap-2 pointer-events-auto">
+          <div class="flex items-center gap-2">
+            <span id="ar-modal-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              🏆 Mais Vendido
+            </span>
+            <span id="ar-modal-scale-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white backdrop-blur-md border border-white/10">
+              14.5 cm (Escala 1:1)
+            </span>
+          </div>
+
+          <!-- 3D Viewport Action Icons -->
+          <div class="flex items-center gap-1.5 bg-slate-950/70 backdrop-blur-md p-1 rounded-xl border border-white/10">
+            <button 
+              id="ar-rotate-toggle-btn"
+              class="w-8 h-8 rounded-lg text-amber-400 hover:bg-white/10 flex items-center justify-center text-xs transition-colors"
+              title="Alternar Rotação 360°"
+            >
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+            <button 
+              id="ar-scale-toggle-btn"
+              class="w-8 h-8 rounded-lg text-amber-400 hover:bg-white/10 flex items-center justify-center text-xs transition-colors"
+              title="Travar/Liberar Escala Real 1:1"
+            >
+              <i class="fa-solid fa-ruler-combined"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Core Google Model-Viewer Element -->
+        <div class="relative flex-1 w-full h-full flex items-center justify-center">
+          
+          <model-viewer
+            id="burger-viewer"
+            src="assets/models/burger-monster.glb"
+            alt="Hambúrguer Gourmet em 3D e Realidade Aumentada"
+            ar
+            ar-modes="webxr scene-viewer quick-look"
+            ar-scale="fixed"
+            ar-placement="floor"
+            camera-controls
+            touch-action="pan-y"
+            auto-rotate
+            auto-rotate-delay="500"
+            rotation-per-second="24deg"
+            shadow-intensity="1.7"
+            shadow-softness="0.8"
+            exposure="1.1"
+            camera-orbit="0deg 75deg 105%"
+            min-camera-orbit="auto auto 5%"
+            max-camera-orbit="auto auto 300%"
+            class="w-full h-full"
+          >
+            <!-- Native AR Slot Button for Model Viewer -->
+            <button slot="ar-button" id="ar-native-slot-btn" class="ar-floating-button">
+              <i class="fa-solid fa-camera-retro text-lg"></i>
+              <span>Abrir Câmera RA (Na Mesa)</span>
+            </button>
+
+            <!-- Loading Progress Bar -->
+            <div id="ar-loading-bar" class="ar-progress-bar" slot="poster">
+              <div class="update-bar"></div>
+            </div>
+
+            <!-- AR Prompt Instructions (Hand Gesture on Mobile) -->
+            <div slot="ar-prompt" class="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/80 px-4 py-2 rounded-xl text-xs text-white border border-white/20">
+              Mova o celular em círculos para detectar a mesa
+            </div>
+          </model-viewer>
+
+        </div>
+
+        <!-- Viewport Bottom Controls -->
+        <div class="relative z-20 p-4 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent flex flex-wrap items-center justify-between gap-3">
+          
+          <div class="text-[11px] text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-hand-pointer text-amber-400 animate-bounce"></i>
+            <span>Arraste para girar em 360° • Pinça para zoom</span>
+          </div>
+
+          <!-- Fallback Camera Simulator Button (Works on Desktop/Laptops or any browser without WebXR) -->
+          <button 
+            id="ar-camera-sim-btn"
+            onclick="toggleCameraSimulator()"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 text-white border border-white/10 flex items-center gap-2 transition-all"
+            title="Usar a webcam ou câmera traseira para simular o hambúrguer no ambiente"
+          >
+            <i class="fa-solid fa-camera text-amber-400"></i>
+            <span>Simulador com Câmera</span>
+          </button>
+
+        </div>
+
+      </div>
+
+      <!-- RIGHT SIDE: Product Sensory Info & Order Section -->
+      <div class="w-full lg:w-[40%] flex-1 p-6 lg:p-8 flex flex-col justify-between overflow-y-auto bg-[#10131c]">
+        
+        <div>
+          <!-- Header info -->
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <div>
+              <span id="ar-modal-weight" class="text-xs font-bold text-amber-500 uppercase tracking-wider block mb-1">
+                220g Blend Nobre • 15-20 min
+              </span>
+              <h2 id="ar-modal-title" class="font-display font-black text-2xl lg:text-3xl text-white leading-tight">
+                The Grand Truffle Master
+              </h2>
+            </div>
+          </div>
+
+          <!-- Price Display -->
+          <div class="flex items-baseline gap-2 mb-6">
+            <span id="ar-modal-price" class="text-3xl font-black text-white">R$ 46,90</span>
+            <span class="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+              Preço Exclusivo Online
+            </span>
+          </div>
+
+          <!-- Core Call To Action: Trigger Augmented Reality (User Spec) -->
+          <div class="p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-red-500/15 border border-amber-500/40 mb-6">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-lg shadow-lg shadow-orange-500/30 shrink-0">
+                <i class="fa-solid fa-cubes"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-extrabold text-white">Experiência em Realidade Aumentada</h4>
+                <p class="text-xs text-slate-300">Projete em tamanho real sobre a sua mesa agora</p>
+              </div>
+            </div>
+
+            <button 
+              id="ar-trigger-btn"
+              onclick="triggerAR()"
+              class="w-full btn-ar-primary py-3.5 px-5 rounded-xl font-extrabold text-sm text-white flex items-center justify-center gap-2.5 shadow-xl shadow-orange-500/30"
+            >
+              <i class="fa-solid fa-camera text-base"></i>
+              <span>Abrir Câmera RA (Escala Real)</span>
+            </button>
+
+            <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 px-1">
+              <span>✓ Suporte nativo Android & iOS</span>
+              <span>✓ Sem instalar aplicativo</span>
+            </div>
+          </div>
+
+          <!-- Sensory Copywriting -->
+          <div class="mb-6">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Descrição Sensorial</h4>
+            <p id="ar-modal-description" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Uma experiência incomparável. Dois smash burgers de 100g de Angus moído fresco na casa, queijo gouda maçaricado, cogumelos salteados no azeite trufado e maionese de alho negro tostado.
+            </p>
+          </div>
+
+          <!-- Ingredients Breakdown -->
+          <div class="mb-6">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Ingredientes Nobres</h4>
+            <ul id="ar-modal-ingredients" class="space-y-1.5">
+              <!-- Rendered dynamically -->
+            </ul>
+          </div>
+        </div>
+
+        <!-- Bottom Actions (Add to Order) -->
+        <div class="pt-4 border-t border-white/10">
+          <button 
+            id="ar-add-to-cart-btn"
+            class="w-full py-4 px-6 rounded-2xl font-black text-sm bg-white hover:bg-slate-200 text-slate-950 transition-colors flex items-center justify-center gap-2 shadow-xl shadow-white/10"
+          >
+            <i class="fa-solid fa-bag-shopping"></i>
+            <span>Adicionar à Sacola • R$ 46,90</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 2: QR CODE PAIRING (DESKTOP TO SMARTPHONE AR)
+       ========================================================================== -->
+  <div id="qr-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl hidden" role="dialog" aria-modal="true">
+    <div class="modal-scale relative w-full max-w-sm bg-[#12141c] rounded-3xl p-6 border border-white/15 text-center shadow-2xl">
+      
+      <button 
+        onclick="closeQrModal()"
+        class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg"
+      >
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl mx-auto mb-4">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+      </div>
+
+      <h3 class="font-display font-black text-xl text-white mb-2">Abra no seu Celular</h3>
+      <p class="text-xs text-slate-400 mb-6">
+        Aponte a câmera do seu smartphone para o QR Code abaixo para testar a Realidade Aumentada nativa na sua mesa:
+      </p>
+
+      <!-- QR Code Canvas Container -->
+      <div class="bg-white p-4 rounded-2xl inline-block shadow-inner mb-4">
+        <div id="qrcode-canvas-container" class="w-[200px] h-[200px] flex items-center justify-center"></div>
+      </div>
+
+      <div class="text-[11px] text-slate-500 break-all mb-4">
+        <span class="block text-slate-400 font-semibold mb-0.5">Endereço de Acesso:</span>
+        <code id="mobile-url-display" class="bg-black/40 px-2 py-1 rounded text-amber-400 font-mono">http://localhost:3000</code>
+      </div>
+
+      <button 
+        onclick="closeQrModal()"
+        class="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition-colors"
+      >
+        Entendi, fechar
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       DRAWER 3: SHOPPING CART & WHATSAPP CHECKOUT
+       ========================================================================== -->
+  <div id="cart-drawer" class="drawer-backdrop fixed inset-0 z-50 bg-black/80 backdrop-blur-md">
+    <div class="drawer-content absolute top-0 right-0 w-full max-w-md h-full bg-[#10121a] border-l border-white/10 flex flex-col justify-between shadow-2xl">
+      
+      <!-- Drawer Header -->
+      <div class="p-6 border-b border-white/10 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-bag-shopping text-amber-400 text-lg"></i>
+          <h3 class="font-display font-black text-xl text-white">Sua Sacola</h3>
+        </div>
+        <button onclick="closeCart()" class="text-slate-400 hover:text-white text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Cart Items Scroll Area -->
+      <div id="cart-items-list" class="p-6 flex-1 overflow-y-auto space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Checkout Form & Totals -->
+      <div class="p-6 bg-slate-950/80 border-t border-white/10 space-y-4">
+        
+        <!-- Customer Details Inputs -->
+        <div class="space-y-2">
+          <input 
+            type="text" 
+            id="checkout-name" 
+            placeholder="Seu Nome Completo" 
+            class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+          <input 
+            type="text" 
+            id="checkout-address" 
+            placeholder="Mesa nº ou Endereço de Entrega" 
+            class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+          <input 
+            type="text" 
+            id="checkout-notes" 
+            placeholder="Observações (sem cebola, ponto da carne, etc.)" 
+            class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+        </div>
+
+        <!-- Totals summary -->
+        <div class="space-y-1.5 text-xs">
+          <div class="flex justify-between text-slate-400">
+            <span>Subtotal:</span>
+            <span id="cart-subtotal" class="font-bold text-white">R$ 0,00</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Taxa de Entrega:</span>
+            <span id="cart-discount" class="font-bold text-emerald-400">R$ 8,00</span>
+          </div>
+          <div class="flex justify-between text-base font-black text-white pt-2 border-t border-white/10">
+            <span>Total:</span>
+            <span id="cart-total" class="text-amber-400 text-lg">R$ 0,00</span>
+          </div>
+        </div>
+
+        <!-- WhatsApp Checkout Button -->
+        <button 
+          onclick="checkoutWhatsApp()"
+          class="w-full py-3.5 px-4 rounded-xl font-extrabold text-sm bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+        >
+          <i class="fa-brands fa-whatsapp text-lg"></i>
+          <span>Enviar Pedido via WhatsApp</span>
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Quick Navigation Bar -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0b10]/95 backdrop-blur-2xl border-t border-white/10 px-6 py-2.5 flex items-center justify-around">
+    <a href="#" class="flex flex-col items-center gap-1 text-amber-500">
+      <i class="fa-solid fa-utensils text-base"></i>
+      <span class="text-[10px] font-bold">Cardápio</span>
+    </a>
+    <button onclick="openArModal('grand-truffle')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+      <i class="fa-solid fa-cube text-base"></i>
+      <span class="text-[10px] font-bold">Destaque 3D</span>
+    </button>
+    <button onclick="openCart()" class="relative flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+      <i class="fa-solid fa-bag-shopping text-base"></i>
+      <span class="text-[10px] font-bold">Sacola</span>
+      <span class="cart-count-badge hidden absolute -top-1 -right-2 w-4 h-4 rounded-full bg-red-600 text-[10px] font-bold items-center justify-center text-white">
+        0
+      </span>
+    </button>
+  </nav>
+
+  <!-- Application Logic -->
+  <script src="assets/js/app.js"></script>
+
+</body>
+</html>
