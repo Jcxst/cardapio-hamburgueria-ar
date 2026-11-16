@@ -191,13 +191,23 @@ function generate3DFromPhoto(imageBuffer, mimeType, outFilename, baseModelType =
   let width = 0.28, height = 0.18, depth = 0.03;
 
   if (baseModelType === 'combo') {
+    const comboGlb = path.join(__dirname, 'assets', 'models', 'combo-badeco.glb');
+    if (fs.existsSync(comboGlb)) {
+      fs.copyFileSync(comboGlb, finalPath);
+      return `assets/models/uploads/${outFilename}`;
+    }
     width = 0.28; height = 0.18; depth = 0.03;
+  } else if (baseModelType === 'burger') {
+    const burgerGlb = path.join(__dirname, 'assets', 'models', 'burger-smash.glb');
+    if (fs.existsSync(burgerGlb)) {
+      fs.copyFileSync(burgerGlb, finalPath);
+      return `assets/models/uploads/${outFilename}`;
+    }
+    width = 0.14; height = 0.11; depth = 0.03;
   } else if (baseModelType === 'fries') {
     width = 0.18; height = 0.13; depth = 0.03;
   } else if (baseModelType === 'drink') {
     width = 0.10; height = 0.22; depth = 0.03;
-  } else if (baseModelType === 'burger') {
-    width = 0.14; height = 0.11; depth = 0.03;
   } else if (dimensions) {
     width = dimensions.width || 0.28;
     height = dimensions.height || 0.18;

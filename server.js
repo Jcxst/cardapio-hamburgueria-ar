@@ -47,6 +47,24 @@ const MIME_TYPES = {
 // Fallback products cache if Supabase table is not yet migrated
 let LOCAL_PRODUCTS_CACHE = [
   {
+    id: 'combo-badeco-especial',
+    name: 'Combo Especial Badeco (Burger + Batata + Guaraná)',
+    category: 'especiais',
+    category_label: 'Combos & Especiais',
+    price: 54.90,
+    original_price: 64.90,
+    rating: 5.0,
+    reviews_count: 672,
+    badge: '👑 Combo da Foto Oficial',
+    image: 'assets/uploads/item_1794852496913.png',
+    model_glb: 'assets/models/combo-badeco.glb',
+    model_https_url: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/combo-badeco.glb',
+    real_scale_cm: '28.0 cm (Combo Completo na Mesa)',
+    prep_time: '15-20 min',
+    weight: 'Tábua Completa (Burger 180g + Batatas + Guaraná)',
+    short_description: 'Combo autêntico Badeco Burguer\'s servido na tábua de madeira gravada: burger brioche com blend e cheddar, porção de batatas douradas e garrafa de Guaraná Antarctica.'
+  },
+  {
     id: 'smash-king',
     name: 'Aura Smash King Deluxe',
     category: 'smash',
@@ -334,7 +352,12 @@ const server = http.createServer(async (req, res) => {
     try {
       const result = await querySupabase('/rest/v1/burger_products?is_active=eq.true&order=created_at.desc');
       if (result.ok && Array.isArray(result.data) && result.data.length > 0) {
-        const mapped = result.data.map(p => ({
+        // Unifica itens do Supabase com itens locais exclusivos (como o Combo Especial Badeco)
+        const sbIds = new Set(result.data.map(p => p.id));
+        const extraLocal = LOCAL_PRODUCTS_CACHE.filter(p => !sbIds.has(p.id));
+        const combined = [...extraLocal, ...result.data];
+
+        const mapped = combined.map(p => ({
           id: p.id,
           name: p.name,
           category: p.category,
@@ -353,7 +376,7 @@ const server = http.createServer(async (req, res) => {
           shortDescription: p.short_description
         }));
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ source: 'supabase', products: mapped }));
+        res.end(JSON.stringify({ source: 'supabase_unified', products: mapped }));
         return;
       }
     } catch (e) {

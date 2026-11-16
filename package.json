@@ -14,5 +14,12 @@
     "cardapio-digital"
   ],
   "author": "Aura Burger Lab",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "gltf-validator": "^2.0.0-dev.3.10",
+    "three": "^0.187.0"
+  }
 }

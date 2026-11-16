@@ -24,6 +24,24 @@ function getApiBase() {
 // Products Catalog (Loaded dynamically from Supabase Backend with Local Fallback)
 let PRODUCTS = [
   {
+    id: 'combo-badeco-especial',
+    name: 'Combo Especial Badeco (Burger + Batata + Guaraná)',
+    category: 'especiais',
+    categoryLabel: 'Combos & Especiais',
+    price: 54.90,
+    originalPrice: 64.90,
+    rating: 5.0,
+    reviewsCount: 672,
+    badge: '👑 Combo da Foto Oficial',
+    image: 'assets/uploads/item_1794852496913.png',
+    modelGlb: 'assets/models/combo-badeco.glb',
+    modelHttpsUrl: 'https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/combo-badeco.glb',
+    realScaleCm: '28.0 cm (Combo Completo na Mesa)',
+    prepTime: '15-20 min',
+    weight: 'Tábua Completa (Burger 180g + Batatas + Guaraná)',
+    shortDescription: 'Combo autêntico Badeco Burguer\'s servido na tábua de madeira gravada: burger brioche com blend e cheddar, porção de batatas douradas e garrafa de Guaraná Antarctica.'
+  },
+  {
     id: 'smash-king',
     name: 'Aura Smash King Deluxe',
     category: 'smash',
@@ -1468,18 +1486,22 @@ async function convertUploadedPhotoTo3D() {
     }
   }
 
+  let defaultModelUrl = null;
+
   if (baseMesh === 'combo') {
     width = 0.28; height = 0.18; depth = 0.04;
     realScaleCm = '28.0 cm (Combo Completo na Mesa)';
+    defaultModelUrl = 'assets/models/combo-badeco.glb';
+  } else if (baseMesh === 'burger') {
+    width = 0.14; height = 0.11; depth = 0.04;
+    realScaleCm = '13.5 cm (Hambúrguer Individual Real)';
+    defaultModelUrl = 'assets/models/burger-smash.glb';
   } else if (baseMesh === 'drink') {
     width = 0.10; height = 0.22; depth = 0.04;
     realScaleCm = '22.0 cm (Bebida / Garrafa Real)';
   } else if (baseMesh === 'fries') {
     width = 0.18; height = 0.13; depth = 0.04;
     realScaleCm = '18.0 cm (Porção Real na Mesa)';
-  } else if (baseMesh === 'burger') {
-    width = 0.14; height = 0.11; depth = 0.04;
-    realScaleCm = '13.5 cm (Hambúrguer Individual Real)';
   }
 
   let modelAssigned = false;
@@ -1489,8 +1511,21 @@ async function convertUploadedPhotoTo3D() {
     state.pendingUploadedArrayBuffer = dataUrlToUint8Array(state.pendingUploadedPhotoBase64);
   }
 
-  // 1. Gera o modelo 3D volumétrico client-side com resultado imediato e 100% fiel ao formato
-  if (state.pendingUploadedArrayBuffer) {
+  // 1. Se houver um modelo 3D dedicado de alta fidelidade para o formato selecionado, exibe imediatamente
+  if (defaultModelUrl) {
+    state.pendingGenerated3D = {
+      imageUrl: state.pendingUploadedPhotoBase64,
+      modelGlbUrl: defaultModelUrl,
+      realScaleCm: realScaleCm
+    };
+
+    if (viewer && previewBox) {
+      viewer.src = defaultModelUrl;
+      previewBox.classList.remove('hidden');
+      modelAssigned = true;
+    }
+  } else if (state.pendingUploadedArrayBuffer) {
+    // Caso contrário, gera o modelo 3D volumétrico client-side com resultado imediato e 100% fiel ao formato
     try {
       const clientGlbUrl = await buildVolumetricGlbClient(
         state.pendingUploadedArrayBuffer,
