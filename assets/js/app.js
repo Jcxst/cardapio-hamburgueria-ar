@@ -1164,6 +1164,19 @@ function processImageBackgroundAndSilhouette(img) {
   };
 }
 
+// Converte DataURL Base64 para Uint8Array de forma síncrona e imediata
+function dataUrlToUint8Array(dataUrl) {
+  if (!dataUrl || !dataUrl.includes(',')) return new Uint8Array(0);
+  const base64 = dataUrl.split(',')[1];
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 // Manipulação do arquivo de foto 2D com processamento visual inteligente
 function handlePhotoFileSelected(e) {
   const file = e.target.files && e.target.files[0];
@@ -1186,13 +1199,7 @@ function handlePhotoFileSelected(e) {
       const cleanPngDataUrl = processed.canvas.toDataURL('image/png');
       state.pendingUploadedPhotoBase64 = cleanPngDataUrl;
       state.pendingUploadedMimeType = 'image/png';
-
-      // Converte canvas para ArrayBuffer para montagem do GLB
-      processed.canvas.toBlob(async (blob) => {
-        if (blob) {
-          state.pendingUploadedArrayBuffer = await blob.arrayBuffer();
-        }
-      }, 'image/png');
+      state.pendingUploadedArrayBuffer = dataUrlToUint8Array(cleanPngDataUrl);
 
       // Atualiza preview da foto 2D
       const previewImg = document.getElementById('photo-preview-img');
@@ -1321,22 +1328,28 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
     const uvView = new DataView(uvBytes.buffer);
     for (let i = 0; i < uvs.length; i++) uvView.setFloat32(i * 4, uvs[i], true);
 
-    let imgArray = imageBytes instanceof Uint8Array ? imageBytes : new Uint8Array(imageBytes);
-    const pad = imgArray.length % 4 === 0 ? 0 : 4 - (imgArray.length % 4);
+    const imgArray = imageBytes instanceof Uint8Array ? imageBytes : new Uint8Array(imageBytes);
+    const imgByteLength = imgArray.length;
+    const pad = imgByteLength % 4 === 0 ? 0 : 4 - (imgByteLength % 4);
+    let paddedImg = imgArray;
     if (pad > 0) {
-      const padded = new Uint8Array(imgArray.length + pad);
-      padded.set(imgArray);
-      imgArray = padded;
+      paddedImg = new Uint8Array(imgByteLength + pad);
+      paddedImg.set(imgArray);
     }
 
-    const totalBinLength = indexBytes.length + posBytes.length + normBytes.length + uvBytes.length + imgArray.length;
+    const offsetIndices = 0;
+    const offsetPositions = offsetIndices + indexBytes.length;
+    const offsetNormals = offsetPositions + posBytes.length;
+    const offsetUvs = offsetNormals + normBytes.length;
+    const offsetImage = offsetUvs + uvBytes.length;
+
+    const totalBinLength = offsetImage + paddedImg.length;
     const binBytes = new Uint8Array(totalBinLength);
-    let off = 0;
-    binBytes.set(indexBytes, off); off += indexBytes.length;
-    binBytes.set(posBytes, off); off += posBytes.length;
-    binBytes.set(normBytes, off); off += normBytes.length;
-    binBytes.set(uvBytes, off); off += uvBytes.length;
-    binBytes.set(imgArray, off);
+    binBytes.set(indexBytes, offsetIndices);
+    binBytes.set(posBytes, offsetPositions);
+    binBytes.set(normBytes, offsetNormals);
+    binBytes.set(uvBytes, offsetUvs);
+    binBytes.set(paddedImg, offsetImage);
 
     const gltf = {
       asset: { version: '2.0', generator: 'AuraBurger Clean Volumetric Extruder' },
@@ -1356,7 +1369,7 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
         name: 'FoodMaterial',
         alphaMode: 'MASK',
         alphaCutoff: 0.1,
-        doubleSided: false, // Back-face culling elimina sobreposição fantasma!
+        doubleSided: true,
         pbrMetallicRoughness: {
           baseColorTexture: { index: 0 },
           roughnessFactor: 0.70,
@@ -1364,8 +1377,13 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
         }
       }],
       textures: [{ sampler: 0, source: 0 }],
-      images: [{ bufferView: 4, mimeType: (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg' }],
-      samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 }],
+      images: [{ bufferView: 4, mimeType: 'image/png' }],
+      samplers: [{
+        magFilter: 9729, // LINEAR
+        minFilter: 9729, // LINEAR (independe de mipmaps NPOT, compatível universalmente)
+        wrapS: 33071,    // CLAMP_TO_EDGE
+        wrapT: 33071     // CLAMP_TO_EDGE
+      }],
       accessors: [
         { bufferView: 0, componentType: 5123, count: indexCount, type: 'SCALAR' },
         { bufferView: 1, componentType: 5126, count: vertexCount, max: [w, h, d], min: [-w, 0, -d], type: 'VEC3' },
@@ -1373,11 +1391,11 @@ async function buildVolumetricGlbClient(imageBytes, mimeType = 'image/png', widt
         { bufferView: 3, componentType: 5126, count: vertexCount, max: [1, 1], min: [0, 0], type: 'VEC2' }
       ],
       bufferViews: [
-        { buffer: 0, byteOffset: 0, byteLength: indexBytes.length, target: 34963 },
-        { buffer: 0, byteOffset: indexBytes.length, byteLength: posBytes.length, target: 34962 },
-        { buffer: 0, byteOffset: indexBytes.length + posBytes.length, byteLength: normBytes.length, target: 34962 },
-        { buffer: 0, byteOffset: indexBytes.length + posBytes.length + normBytes.length, byteLength: uvBytes.length, target: 34962 },
-        { buffer: 0, byteOffset: indexBytes.length + posBytes.length + normBytes.length, byteLength: imageBytes.byteLength }
+        { buffer: 0, byteOffset: offsetIndices, byteLength: indexBytes.length, target: 34963 },
+        { buffer: 0, byteOffset: offsetPositions, byteLength: posBytes.length, target: 34962 },
+        { buffer: 0, byteOffset: offsetNormals, byteLength: normBytes.length, target: 34962 },
+        { buffer: 0, byteOffset: offsetUvs, byteLength: uvBytes.length, target: 34962 },
+        { buffer: 0, byteOffset: offsetImage, byteLength: imgByteLength }
       ],
       buffers: [{ byteLength: totalBinLength }]
     };
@@ -1465,6 +1483,11 @@ async function convertUploadedPhotoTo3D() {
   }
 
   let modelAssigned = false;
+
+  // Garante que os bytes da imagem estejam disponíveis de forma síncrona
+  if (!state.pendingUploadedArrayBuffer && state.pendingUploadedPhotoBase64) {
+    state.pendingUploadedArrayBuffer = dataUrlToUint8Array(state.pendingUploadedPhotoBase64);
+  }
 
   // 1. Gera o modelo 3D volumétrico client-side com resultado imediato e 100% fiel ao formato
   if (state.pendingUploadedArrayBuffer) {

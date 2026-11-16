@@ -3,11 +3,11 @@ const path = require('path');
 
 /**
  * Constrói um modelo 3D GLB volumétrico recortado diretamente da foto do produto.
- * Utiliza alphaMode: MASK para recortar o fundo e doubleSided: false para evitar
- * qualquer sobreposição fantasma (ghost double-vision) em Realidade Aumentada.
+ * Utiliza alphaMode: MASK para recortar o fundo e minFilter/magFilter: 9729 (LINEAR)
+ * garantindo compatibilidade universal com qualquer dimensão de imagem (sem falha de mipmap NPOT).
  * A base é fixada perfeitamente plana em Y = 0 para ancorar na mesa com WebXR.
  */
-function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 0.18, depth = 0.04) {
+function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 0.18, depth = 0.03) {
   const w = width / 2;
   const h = height;
   const d = depth / 2;
@@ -16,7 +16,7 @@ function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 
   const positions = [
     // Face Frontal (Z = +d)
     -w, 0,  d,   w, 0,  d,   w, h,  d,  -w, h,  d,
-    // Face Traseira (Z = -d, apontando para trás)
+    // Face Traseira (Z = -d, virada para trás)
     -w, 0, -d,  -w, h, -d,   w, h, -d,   w, 0, -d,
     // Borda Superior (Topo)
     -w, h,  d,   w, h,  d,   w, h, -d,  -w, h, -d,
@@ -124,7 +124,7 @@ function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 
       name: 'FoodMaterial',
       alphaMode: 'MASK',
       alphaCutoff: 0.1,
-      doubleSided: false, // Evita sobreposição fantasma (ghost double-vision)
+      doubleSided: true,
       pbrMetallicRoughness: {
         baseColorTexture: { index: 0 },
         roughnessFactor: 0.70,
@@ -133,7 +133,12 @@ function buildVolumetricGlbBuffer(imageBuffer, mimeType, width = 0.28, height = 
     }],
     textures: [{ sampler: 0, source: 0 }],
     images: [{ bufferView: 4, mimeType: (mimeType && mimeType.includes('png')) ? 'image/png' : 'image/jpeg' }],
-    samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 }],
+    samplers: [{
+      magFilter: 9729, // LINEAR
+      minFilter: 9729, // LINEAR (sem dependência de mipmaps NPOT)
+      wrapS: 33071,    // CLAMP_TO_EDGE
+      wrapT: 33071     // CLAMP_TO_EDGE
+    }],
     accessors: [
       { bufferView: 0, componentType: 5123, count: indices.length, type: 'SCALAR' },
       { bufferView: 1, componentType: 5126, count: vertexCount, max: [w, h, d], min: [-w, 0, -d], type: 'VEC3' },
@@ -183,21 +188,20 @@ function generate3DFromPhoto(imageBuffer, mimeType, outFilename, baseModelType =
   }
   const finalPath = path.join(outDir, outFilename);
 
-  // Calibra as dimensões reais 1:1 conforme o tipo do item
-  let width = 0.28, height = 0.18, depth = 0.04;
+  let width = 0.28, height = 0.18, depth = 0.03;
 
   if (baseModelType === 'combo') {
-    width = 0.28; height = 0.18; depth = 0.04;
+    width = 0.28; height = 0.18; depth = 0.03;
   } else if (baseModelType === 'fries') {
-    width = 0.18; height = 0.13; depth = 0.04;
+    width = 0.18; height = 0.13; depth = 0.03;
   } else if (baseModelType === 'drink') {
-    width = 0.10; height = 0.22; depth = 0.04;
+    width = 0.10; height = 0.22; depth = 0.03;
   } else if (baseModelType === 'burger') {
-    width = 0.14; height = 0.11; depth = 0.04;
+    width = 0.14; height = 0.11; depth = 0.03;
   } else if (dimensions) {
     width = dimensions.width || 0.28;
     height = dimensions.height || 0.18;
-    depth = dimensions.depth || 0.04;
+    depth = dimensions.depth || 0.03;
   }
 
   // Gera o modelo 3D volumétrico que segue a foto
