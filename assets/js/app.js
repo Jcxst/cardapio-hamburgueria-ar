@@ -3,8 +3,8 @@
  * Powered by Google <model-viewer>, Scene Viewer (ARCore) & Apple Quick Look
  */
 
-// Products Catalog with Calibrated 1:1 Physical 3D Models
-const PRODUCTS = [
+// Products Catalog (Loaded dynamically from Supabase Backend with Local Fallback)
+let PRODUCTS = [
   {
     id: 'smash-king',
     name: 'Aura Smash King Deluxe',
@@ -153,11 +153,30 @@ const elements = {
 // Initialize Application
 async function initApp() {
   fetchNetworkInfo();
-  renderProducts();
+  await loadProductsFromBackend();
   setupEventListeners();
   setupModelViewerEvents();
   loadCartFromStorage();
   updateCartUI();
+}
+
+// Load products dynamically from Supabase Backend (with local fallback)
+async function loadProductsFromBackend() {
+  try {
+    const res = await fetch('/api/products');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.products && data.products.length > 0) {
+        PRODUCTS = data.products;
+        console.log(`🍔 Produtos carregados do backend (${data.source}):`, PRODUCTS.length);
+        renderProducts();
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao carregar /api/products do backend, usando dados locais:', err);
+  }
+  renderProducts();
 }
 
 // Fetch network IP from server
@@ -561,6 +580,25 @@ function checkoutWhatsApp() {
   msg += `*TOTAL:* *R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
   msg += `*Observações:* ${notes}\n\n`;
   msg += `_Pedido gerado via Cardápio Digital 3D & Realidade Aumentada_`;
+
+  // Sincroniza o pedido no banco de dados Supabase via backend API
+  fetch('/api/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      customerName,
+      tableOrAddress,
+      notes,
+      items: state.cart.map(i => ({ id: i.product.id, name: i.product.name, price: i.product.price, quantity: i.quantity })),
+      subtotal,
+      deliveryFee: delivery,
+      total
+    })
+  }).then(r => r.json()).then(res => {
+    console.log('✅ Pedido salvo no banco de dados Supabase:', res);
+  }).catch(err => {
+    console.warn('Erro ao salvar no Supabase:', err);
+  });
 
   const phone = '5511999999999';
   const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
