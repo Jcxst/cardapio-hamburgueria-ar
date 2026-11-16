@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const https = require('https');
+const { generate3DFromPhoto } = require('./generator3d');
 
 // Load environment variables from .env
 function loadEnv() {
@@ -44,7 +45,7 @@ const MIME_TYPES = {
 };
 
 // Fallback products cache if Supabase table is not yet migrated
-const FALLBACK_PRODUCTS = [
+let LOCAL_PRODUCTS_CACHE = [
   {
     id: 'smash-king',
     name: 'Aura Smash King Deluxe',
@@ -155,6 +156,8 @@ const FALLBACK_PRODUCTS = [
   }
 ];
 
+let LOCAL_ORDERS_CACHE = [];
+
 function getLocalIpAddresses() {
   const interfaces = os.networkInterfaces();
   const addresses = [];
@@ -211,10 +214,24 @@ function querySupabase(pathStr, method = 'GET', bodyData = null) {
   });
 }
 
+function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
@@ -224,31 +241,92 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Parse URL
   const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
 
-  // 1. API: Informações de Rede e Supabase
-  if (parsedUrl.pathname === '/api/info') {
-    const ips = getLocalIpAddresses();
-    const primaryIp = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.')) || ips[0] || 'localhost';
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      port: PORT,
-      localIps: ips,
-      primaryIp,
-      mobileUrl: `http://${primaryIp}:${PORT}`,
-      supabaseUrl: SUPABASE_URL,
-      supabaseConnected: !!SUPABASE_URL
-    }));
+  // =========================================================================
+  // 1. AUTENTICAÇÃO DO FUNCIONÁRIO (teste3d / 123teste)
+  // =========================================================================
+  if (parsedUrl.pathname === '/api/auth/login' && req.method === 'POST') {
+    try {
+      const { username, password } = await parseJsonBody(req);
+      if (username === 'teste3d' && password === '123teste') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: 'Autenticado com sucesso!',
+          token: 'aura_token_' + Date.now(),
+          user: { username: 'teste3d', role: 'funcionario' }
+        }));
+      } else {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Usuário ou senha incorretos. Utilize teste3d / 123teste.'
+        }));
+      }
+    } catch (err) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'JSON inválido' }));
+    }
     return;
   }
 
-  // 2. API: Obter Produtos do Cardápio (Supabase com Fallback)
+  // =========================================================================
+  // 2. CONVERSOR DE FOTO 2D PARA MODELO 3D GLB REAL
+  // =========================================================================
+  if (parsedUrl.pathname === '/api/admin/convert-3d' && req.method === 'POST') {
+    try {
+      const { imageBase64, mimeType, baseModel = 'smash', title = 'Novo Burger' } = await parseJsonBody(req);
+      
+      if (!imageBase64) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Nenhuma imagem enviada.' }));
+        return;
+      }
+
+      // Limpa prefixo data:image/jpeg;base64, se presente
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+      const imageBuffer = Buffer.from(cleanBase64, 'base64');
+      const ext = (mimeType && mimeType.includes('png')) ? 'png' : 'jpg';
+
+      const fileId = 'burger_' + Date.now();
+      const imageFilename = `${fileId}.${ext}`;
+      const glbFilename = `${fileId}.glb`;
+
+      // 1. Salva foto 2D enviada
+      const uploadDir = path.join(ROOT, 'assets', 'uploads');
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadDir, imageFilename), imageBuffer);
+      const imageUrl = `assets/uploads/${imageFilename}`;
+
+      // 2. Converte a foto 2D no modelo 3D GLB calibrado com dimensões reais 1:1
+      const modelGlbUrl = generate3DFromPhoto(imageBuffer, mimeType || 'image/jpeg', glbFilename, baseModel);
+
+      console.log(`✨ Foto convertida em 3D com sucesso: ${modelGlbUrl}`);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        imageUrl,
+        modelGlbUrl,
+        realScaleCm: '13.5 cm (Escala 1:1 Real)',
+        message: 'Modelo 3D gerado com sucesso a partir da foto!'
+      }));
+    } catch (err) {
+      console.error('Erro na geração 3D:', err);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // =========================================================================
+  // 3. API: OBTER PRODUTOS DO CARDÁPIO (SUPABASE + FALLBACK)
+  // =========================================================================
   if (parsedUrl.pathname === '/api/products' && req.method === 'GET') {
     try {
-      const result = await querySupabase('/rest/v1/burger_products?select=*&order=price.asc');
+      const result = await querySupabase('/rest/v1/burger_products?is_active=eq.true&order=created_at.desc');
       if (result.ok && Array.isArray(result.data) && result.data.length > 0) {
-        // Map database columns to app schema
         const mapped = result.data.map(p => ({
           id: p.id,
           name: p.name,
@@ -272,11 +350,11 @@ const server = http.createServer(async (req, res) => {
         return;
       }
     } catch (e) {
-      console.warn('Supabase não disponível no momento, usando fallback:', e.message);
+      console.warn('Supabase não disponível no momento, usando cache local:', e.message);
     }
 
-    // Fallback gracioso
-    const mappedFallback = FALLBACK_PRODUCTS.map(p => ({
+    // Fallback local
+    const mappedFallback = LOCAL_PRODUCTS_CACHE.map(p => ({
       id: p.id,
       name: p.name,
       category: p.category,
@@ -295,44 +373,155 @@ const server = http.createServer(async (req, res) => {
       shortDescription: p.short_description
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ source: 'local_fallback', products: mappedFallback }));
+    res.end(JSON.stringify({ source: 'local_cache', products: mappedFallback }));
     return;
   }
 
-  // 3. API: Criar Pedido (Salva no Supabase)
+  // =========================================================================
+  // 4. ADMIN: ADICIONAR PRODUTO (SALVA NO SUPABASE)
+  // =========================================================================
+  if (parsedUrl.pathname === '/api/admin/products' && req.method === 'POST') {
+    try {
+      const prod = await parseJsonBody(req);
+      const newProduct = {
+        id: prod.id || 'burger_' + Date.now(),
+        name: prod.name || 'Hambúrguer Especial',
+        category: prod.category || 'artesanais',
+        category_label: prod.categoryLabel || 'Burgers Artesanais',
+        price: parseFloat(prod.price) || 39.90,
+        original_price: prod.originalPrice ? parseFloat(prod.originalPrice) : null,
+        rating: 5.0,
+        reviews_count: 1,
+        badge: prod.badge || '✨ Novidade',
+        image: prod.image || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=80',
+        model_glb: prod.modelGlb || 'assets/models/burger-smash.glb',
+        model_https_url: prod.modelHttpsUrl || `https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/assets/models/burger-smash.glb`,
+        real_scale_cm: prod.realScaleCm || '13.5 cm (Escala 1:1 Real)',
+        prep_time: prod.prepTime || '15 min',
+        weight: prod.weight || '180g',
+        short_description: prod.shortDescription || 'Receita exclusiva artesanal.',
+        is_active: true
+      };
+
+      // Tenta salvar no Supabase
+      const sbResult = await querySupabase('/rest/v1/burger_products', 'POST', newProduct);
+      
+      // Adiciona também ao cache local
+      LOCAL_PRODUCTS_CACHE.unshift(newProduct);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        savedToSupabase: sbResult.ok,
+        product: newProduct
+      }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // =========================================================================
+  // 5. ADMIN: REMOVER PRODUTO (SUPABASE DELETE)
+  // =========================================================================
+  if (parsedUrl.pathname.startsWith('/api/admin/products/') && req.method === 'DELETE') {
+    try {
+      const productId = parsedUrl.pathname.split('/').pop();
+      
+      // Remove do Supabase
+      const sbResult = await querySupabase(`/rest/v1/burger_products?id=eq.${encodeURIComponent(productId)}`, 'DELETE');
+
+      // Remove do cache local
+      LOCAL_PRODUCTS_CACHE = LOCAL_PRODUCTS_CACHE.filter(p => p.id !== productId);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        deletedFromSupabase: sbResult.ok,
+        productId
+      }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // =========================================================================
+  // 6. CLIENTE: CRIAR PEDIDO (SUPABASE)
+  // =========================================================================
   if (parsedUrl.pathname === '/api/orders' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
-      try {
-        const orderData = JSON.parse(body);
-        const supabasePayload = {
-          customer_name: orderData.customerName || 'Cliente Balcão',
-          table_or_address: orderData.tableOrAddress || 'Mesa / Retirada',
-          notes: orderData.notes || '',
-          items: orderData.items || [],
-          subtotal: orderData.subtotal || 0,
-          delivery_fee: orderData.deliveryFee || 0,
-          total: orderData.total || 0,
-          status: 'recebido'
-        };
+    try {
+      const orderData = await parseJsonBody(req);
+      const supabasePayload = {
+        customer_name: orderData.customerName || 'Cliente Balcão',
+        table_or_address: orderData.tableOrAddress || 'Mesa / Retirada',
+        notes: orderData.notes || '',
+        items: orderData.items || [],
+        subtotal: orderData.subtotal || 0,
+        delivery_fee: orderData.deliveryFee || 0,
+        total: orderData.total || 0,
+        status: 'recebido'
+      };
 
-        const result = await querySupabase('/rest/v1/burger_orders', 'POST', supabasePayload);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          success: true,
-          savedToSupabase: result.ok,
-          order: result.data || supabasePayload
-        }));
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: err.message }));
-      }
-    });
+      const result = await querySupabase('/rest/v1/burger_orders', 'POST', supabasePayload);
+      LOCAL_ORDERS_CACHE.unshift({ ...supabasePayload, id: 'ord_' + Date.now(), created_at: new Date().toISOString() });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        savedToSupabase: result.ok,
+        order: result.data || supabasePayload
+      }));
+    } catch (err) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
     return;
   }
 
-  // 4. Servir Arquivos Estáticos
+  // =========================================================================
+  // 7. ADMIN: LISTAR PEDIDOS
+  // =========================================================================
+  if (parsedUrl.pathname === '/api/admin/orders' && req.method === 'GET') {
+    try {
+      const result = await querySupabase('/rest/v1/burger_orders?select=*&order=created_at.desc&limit=30');
+      if (result.ok && Array.isArray(result.data)) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ source: 'supabase', orders: result.data }));
+        return;
+      }
+    } catch (e) {
+      console.warn('Erro ao ler pedidos do Supabase:', e.message);
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ source: 'local_cache', orders: LOCAL_ORDERS_CACHE }));
+    return;
+  }
+
+  // =========================================================================
+  // 8. API INFO & STATUS
+  // =========================================================================
+  if (parsedUrl.pathname === '/api/info') {
+    const ips = getLocalIpAddresses();
+    const primaryIp = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.')) || ips[0] || 'localhost';
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      port: PORT,
+      localIps: ips,
+      primaryIp,
+      mobileUrl: `http://${primaryIp}:${PORT}`,
+      supabaseUrl: SUPABASE_URL,
+      supabaseConnected: !!SUPABASE_URL
+    }));
+    return;
+  }
+
+  // =========================================================================
+  // 9. SERVIR ARQUIVOS ESTÁTICOS
+  // =========================================================================
   let safePath = path.normalize(decodeURIComponent(parsedUrl.pathname)).replace(/^(\.\.[/\\])+/, '');
   if (safePath === '/' || safePath === '\\') {
     safePath = '/index.html';
@@ -356,7 +545,7 @@ const server = http.createServer(async (req, res) => {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    // Suporte a HTTP Range Requests (indispensável para streaming de modelos 3D GLB)
+    // Suporte a HTTP Range Requests (streaming de GLB)
     const range = req.headers.range;
     const fileSize = stats.size;
 
@@ -397,10 +586,11 @@ server.listen(PORT, '0.0.0.0', () => {
   const primaryIp = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.')) || ips[0] || 'localhost';
 
   console.log('====================================================');
-  console.log('🍔 AURA BURGER - Backend & Cardápio Digital 3D');
+  console.log('🍔 AURA BURGER - Backend, Dashboard & Supabase API');
   console.log('====================================================');
   console.log(`📡 Local:    http://localhost:${PORT}`);
-  console.log(`📱 No Celular (Mesmo Wi-Fi): http://${primaryIp}:${PORT}`);
+  console.log(`📱 No Celular: http://${primaryIp}:${PORT}`);
   console.log(`🗄️  Supabase: ${SUPABASE_URL}`);
+  console.log('🔐 Admin Login: teste3d / 123teste');
   console.log('====================================================');
 });

@@ -668,8 +668,437 @@ function setupEventListeners() {
       closeArModal();
       closeCart();
       closeQrModal();
+      closeAdminAuth();
+      closeAdminDashboard();
     }
   });
+}
+
+// ============================================================================
+// ADMIN DASHBOARD, SUPABASE SYNC & 3D PHOTO CONVERTER
+// ============================================================================
+
+function openAdminAuth() {
+  if (sessionStorage.getItem('aura_admin_token')) {
+    openAdminDashboard();
+    return;
+  }
+  const modal = document.getElementById('admin-auth-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    const err = document.getElementById('admin-auth-error');
+    if (err) err.classList.add('hidden');
+    setTimeout(() => {
+      document.getElementById('admin-username')?.focus();
+    }, 100);
+  }
+}
+
+function closeAdminAuth() {
+  const modal = document.getElementById('admin-auth-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleAdminLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('admin-username')?.value.trim();
+  const password = document.getElementById('admin-password')?.value.trim();
+  const submitBtn = document.getElementById('admin-login-btn');
+  const errBox = document.getElementById('admin-auth-error');
+  const errMsg = document.getElementById('admin-auth-error-msg');
+
+  if (errBox) errBox.classList.add('hidden');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Verificando...</span>';
+  }
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      sessionStorage.setItem('aura_admin_token', data.token);
+      closeAdminAuth();
+      showToastNotification('Bem-vindo ao Painel, ' + username + '!');
+      openAdminDashboard();
+    } else {
+      if (errBox && errMsg) {
+        errMsg.textContent = data.error || 'Credenciais inválidas. Use teste3d / 123teste.';
+        errBox.classList.remove('hidden');
+      }
+    }
+  } catch (err) {
+    if (errBox && errMsg) {
+      errMsg.textContent = 'Erro de conexão com o servidor.';
+      errBox.classList.remove('hidden');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i><span>Entrar no Dashboard</span>';
+    }
+  }
+}
+
+function openAdminDashboard() {
+  const modal = document.getElementById('admin-dashboard-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    switchAdminTab('products');
+    renderAdminProducts();
+    loadAdminOrders();
+  }
+}
+
+function closeAdminDashboard() {
+  const modal = document.getElementById('admin-dashboard-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function adminLogout() {
+  sessionStorage.removeItem('aura_admin_token');
+  closeAdminDashboard();
+  showToastNotification('Sessão encerrada com sucesso.');
+}
+
+function switchAdminTab(tabName) {
+  const tabs = ['products', 'new', 'orders'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`tab-btn-${t}`);
+    const content = document.getElementById(`admin-tab-${t}`);
+    if (t === tabName) {
+      if (btn) {
+        btn.classList.add('border-amber-500', 'text-amber-400', 'bg-white/5');
+        btn.classList.remove('border-transparent', 'text-slate-400');
+      }
+      if (content) content.classList.remove('hidden');
+    } else {
+      if (btn) {
+        btn.classList.remove('border-amber-500', 'text-amber-400', 'bg-white/5');
+        btn.classList.add('border-transparent', 'text-slate-400');
+      }
+      if (content) content.classList.add('hidden');
+    }
+  });
+
+  if (tabName === 'products') renderAdminProducts();
+  if (tabName === 'orders') loadAdminOrders();
+}
+
+function renderAdminProducts() {
+  const container = document.getElementById('admin-products-table');
+  const countBadge = document.getElementById('admin-badge-prod-count');
+  if (countBadge) countBadge.textContent = PRODUCTS.length;
+
+  if (!container) return;
+
+  if (PRODUCTS.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full py-12 text-center text-slate-400 bg-white/5 rounded-2xl border border-white/5">
+        <i class="fa-solid fa-burger text-4xl mb-3 text-amber-500/40"></i>
+        <h4 class="text-base font-bold text-white mb-1">Nenhum produto cadastrado no momento</h4>
+        <p class="text-xs">Clique na aba "Novo Produto + Criador 3D" para adicionar.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = PRODUCTS.map(prod => `
+    <div class="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4 hover:border-amber-500/30 transition-colors">
+      <div class="flex items-center gap-3.5 min-w-0">
+        <img 
+          src="${prod.image}" 
+          alt="${prod.name}" 
+          class="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0 bg-slate-900" 
+        />
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0">
+              ${prod.categoryLabel || prod.category}
+            </span>
+            <span class="text-[10px] text-slate-400 font-mono shrink-0">
+              <i class="fa-solid fa-cube text-amber-500"></i> ${prod.realScaleCm || '13.5cm'}
+            </span>
+          </div>
+          <h4 class="text-sm font-extrabold text-white truncate">${prod.name}</h4>
+          <div class="text-xs font-black text-amber-400 mt-0.5">
+            R$ ${parseFloat(prod.price).toFixed(2).replace('.', ',')}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <button 
+          onclick="openArModal('${prod.id}')"
+          class="w-9 h-9 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400 border border-white/10 flex items-center justify-center text-xs transition-colors cursor-pointer"
+          title="Inspecionar em 3D / RA"
+        >
+          <i class="fa-solid fa-eye"></i>
+        </button>
+        <button 
+          onclick="adminDeleteProduct('${prod.id}', '${encodeURIComponent(prod.name)}')"
+          class="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/20 hover:border-red-500/40 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+          title="Remover produto do Supabase"
+        >
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Remover</span>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function adminDeleteProduct(productId, encodedName) {
+  const prodName = decodeURIComponent(encodedName);
+  if (!confirm(`Tem certeza que deseja remover "${prodName}" do cardápio e do banco de dados Supabase?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/products/${encodeURIComponent(productId)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      showToastNotification(`"${prodName}" removido com sucesso.`);
+      PRODUCTS = PRODUCTS.filter(p => p.id !== productId);
+      renderProducts();
+      renderAdminProducts();
+    } else {
+      alert('Erro ao remover produto: ' + (data.error || 'Falha na requisição.'));
+    }
+  } catch (err) {
+    alert('Erro de conexão ao remover produto: ' + err.message);
+  }
+}
+
+// Manipulação do arquivo de foto 2D
+function handlePhotoFileSelected(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    alert('Por favor, selecione um arquivo de imagem válido (JPG, PNG ou WebP).');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const base64Data = evt.target.result;
+    state.pendingUploadedPhotoBase64 = base64Data;
+    state.pendingUploadedMimeType = file.type;
+
+    const previewImg = document.getElementById('photo-preview-img');
+    const previewWrap = document.getElementById('photo-preview-wrapper');
+    const placeholder = document.getElementById('photo-placeholder');
+    const generateBtn = document.getElementById('btn-generate-3d');
+
+    if (previewImg && previewWrap && placeholder) {
+      previewImg.src = base64Data;
+      placeholder.classList.add('hidden');
+      previewWrap.classList.remove('hidden');
+    }
+
+    if (generateBtn) {
+      generateBtn.disabled = false;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// Converte a foto 2D enviada em modelo 3D GLB
+async function convertUploadedPhotoTo3D() {
+  if (!state.pendingUploadedPhotoBase64) {
+    alert('Selecione primeiro uma foto de hambúrguer para converter em 3D.');
+    return;
+  }
+
+  const generateBtn = document.getElementById('btn-generate-3d');
+  const btnText = document.getElementById('btn-generate-3d-text');
+  const baseMesh = document.getElementById('new-prod-base-mesh')?.value || 'smash';
+  const prodTitle = document.getElementById('new-prod-name')?.value || 'Burger Artesanal';
+
+  if (generateBtn) generateBtn.disabled = true;
+  if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Processando Textura PBR & Gerando GLB 1:1...';
+
+  try {
+    const res = await fetch('/api/admin/convert-3d', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageBase64: state.pendingUploadedPhotoBase64,
+        mimeType: state.pendingUploadedMimeType || 'image/jpeg',
+        baseModel: baseMesh,
+        title: prodTitle
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      state.pendingGenerated3D = {
+        imageUrl: data.imageUrl,
+        modelGlbUrl: data.modelGlbUrl,
+        realScaleCm: data.realScaleCm
+      };
+
+      const previewBox = document.getElementById('admin-3d-preview-box');
+      const viewer = document.getElementById('admin-preview-viewer');
+      if (previewBox && viewer) {
+        viewer.src = data.modelGlbUrl;
+        previewBox.classList.remove('hidden');
+      }
+
+      showToastNotification('✨ Modelo 3D criado com sucesso a partir da foto!');
+    } else {
+      alert('Erro na conversão 3D: ' + (data.error || 'Erro desconhecido.'));
+    }
+  } catch (err) {
+    alert('Erro de rede ao converter foto em 3D: ' + err.message);
+  } finally {
+    if (generateBtn) generateBtn.disabled = false;
+    if (btnText) btnText.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>✨ Recriar Modelo 3D';
+  }
+}
+
+// Cria e salva novo produto no Supabase
+async function handleCreateProductSubmit(e) {
+  e.preventDefault();
+
+  const name = document.getElementById('new-prod-name')?.value.trim();
+  const category = document.getElementById('new-prod-category')?.value;
+  const price = parseFloat(document.getElementById('new-prod-price')?.value);
+  const originalPriceVal = document.getElementById('new-prod-original-price')?.value;
+  const originalPrice = originalPriceVal ? parseFloat(originalPriceVal) : null;
+  const badge = document.getElementById('new-prod-badge')?.value.trim() || '✨ Novidade';
+  const weight = document.getElementById('new-prod-weight')?.value.trim() || '180g';
+  const prepTime = document.getElementById('new-prod-prep-time')?.value.trim() || '15 min';
+  const shortDescription = document.getElementById('new-prod-description')?.value.trim();
+
+  const categoryLabels = {
+    smash: 'Smash Burgers',
+    artesanais: 'Burgers Artesanais',
+    especiais: 'Especiais do Chef',
+    acompanhamentos: 'Acompanhamentos',
+    sobremesas: 'Sobremesas & Shakes'
+  };
+
+  const publishBtn = document.getElementById('btn-publish-product');
+  if (publishBtn) {
+    publishBtn.disabled = true;
+    publishBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span>Publicando no Supabase...</span>';
+  }
+
+  const imageUrl = state.pendingGenerated3D?.imageUrl || state.pendingUploadedPhotoBase64 || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=80';
+  const modelGlb = state.pendingGenerated3D?.modelGlbUrl || 'assets/models/burger-smash.glb';
+  const realScaleCm = state.pendingGenerated3D?.realScaleCm || '13.5 cm (Escala 1:1 Real)';
+
+  const payload = {
+    id: 'burger_' + Date.now(),
+    name,
+    category,
+    categoryLabel: categoryLabels[category] || 'Burgers Artesanais',
+    price,
+    originalPrice,
+    badge,
+    weight,
+    prepTime,
+    shortDescription,
+    image: imageUrl,
+    modelGlb: modelGlb,
+    modelHttpsUrl: `https://raw.githubusercontent.com/Jcxst/cardapio-hamburgueria-ar/main/${modelGlb}`,
+    realScaleCm
+  };
+
+  try {
+    const res = await fetch('/api/admin/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      showToastNotification(`"${name}" publicado com sucesso no Supabase!`);
+      
+      await loadProductsFromBackend();
+      
+      document.getElementById('admin-new-product-form')?.reset();
+      state.pendingUploadedPhotoBase64 = null;
+      state.pendingGenerated3D = null;
+      document.getElementById('photo-preview-wrapper')?.classList.add('hidden');
+      document.getElementById('photo-placeholder')?.classList.remove('hidden');
+      document.getElementById('admin-3d-preview-box')?.classList.add('hidden');
+      const genBtn = document.getElementById('btn-generate-3d');
+      if (genBtn) genBtn.disabled = true;
+
+      switchAdminTab('products');
+    } else {
+      alert('Erro ao publicar produto no Supabase: ' + (data.error || 'Erro desconhecido'));
+    }
+  } catch (err) {
+    alert('Erro de conexão ao salvar no Supabase: ' + err.message);
+  } finally {
+    if (publishBtn) {
+      publishBtn.disabled = false;
+      publishBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-1.5"></i><span>Publicar no Cardápio (Salvar no Supabase)</span>';
+    }
+  }
+}
+
+// Carrega pedidos salvos no Supabase
+async function loadAdminOrders() {
+  const container = document.getElementById('admin-orders-list');
+  const countBadge = document.getElementById('admin-badge-orders-count');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/admin/orders');
+    if (res.ok) {
+      const data = await res.json();
+      const orders = data.orders || [];
+      if (countBadge) countBadge.textContent = orders.length;
+
+      if (orders.length === 0) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-slate-400 bg-white/5 rounded-2xl border border-white/5">
+            <i class="fa-solid fa-receipt text-4xl mb-3 text-amber-500/40"></i>
+            <h4 class="text-base font-bold text-white mb-1">Nenhum pedido recebido ainda</h4>
+            <p class="text-xs">Os pedidos enviados pelos clientes via WhatsApp e Cardápio aparecerão aqui.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = orders.map(ord => `
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2 hover:border-amber-500/30 transition-colors">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-bold text-white text-sm">${ord.customer_name || 'Cliente'}</span>
+              <span class="text-xs text-slate-400 font-medium">• ${ord.table_or_address || 'Consumo Local'}</span>
+            </div>
+            <span class="text-xs font-mono font-black text-amber-400">
+              Total: R$ ${parseFloat(ord.total || 0).toFixed(2).replace('.', ',')}
+            </span>
+          </div>
+
+          <div class="text-xs text-slate-300">
+            ${Array.isArray(ord.items) ? ord.items.map(i => `• ${i.quantity}x ${i.name}`).join('<br>') : 'Itens do pedido'}
+          </div>
+
+          ${ord.notes ? `<div class="text-[11px] text-slate-400 bg-black/40 px-2.5 py-1 rounded-lg"><strong>Obs:</strong> ${ord.notes}</div>` : ''}
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.warn('Erro ao carregar pedidos:', err);
+  }
 }
 
 // Global functions exposed to window
@@ -683,6 +1112,20 @@ window.updateCartQuantity = updateCartQuantity;
 window.openCart = openCart;
 window.closeCart = closeCart;
 window.checkoutWhatsApp = checkoutWhatsApp;
+// Admin functions
+window.openAdminAuth = openAdminAuth;
+window.closeAdminAuth = closeAdminAuth;
+window.handleAdminLogin = handleAdminLogin;
+window.openAdminDashboard = openAdminDashboard;
+window.closeAdminDashboard = closeAdminDashboard;
+window.adminLogout = adminLogout;
+window.switchAdminTab = switchAdminTab;
+window.renderAdminProducts = renderAdminProducts;
+window.adminDeleteProduct = adminDeleteProduct;
+window.handlePhotoFileSelected = handlePhotoFileSelected;
+window.convertUploadedPhotoTo3D = convertUploadedPhotoTo3D;
+window.handleCreateProductSubmit = handleCreateProductSubmit;
+window.loadAdminOrders = loadAdminOrders;
 
 // Bootstrap on DOM ready
 document.addEventListener('DOMContentLoaded', initApp);
